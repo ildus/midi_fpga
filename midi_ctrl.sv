@@ -24,22 +24,22 @@ logic [7:0] data2;
 logic [12:0] clk_cnt;
 logic [29:0] midi_out;
 
-always_ff @(posedge clk) begin
-    if (clk_cnt == BAUD_CNT_HALF - 1) begin
+always_ff @(posedge clk or negedge rst) begin
+    if (!rst) begin
         clk_cnt <= 0;
-        baud_clk <= ~baud_clk;
+        baud_clk <= 0;
+        led <= 0;
+        bits_cnt <= 0;
+        midi_tx <= 0;
     end
     else begin
         clk_cnt <= clk_cnt + 1;
-    end
-end
 
-always_ff @(negedge rst) begin
-    clk_cnt <= 0;
-    led <= 0;
-    bits_cnt <= 0;
-    baud_clk <= 0;
-    midi_tx <= 0;
+        if (clk_cnt == BAUD_CNT_HALF) begin
+            clk_cnt <= 0;
+            baud_clk <= ~baud_clk;
+        end
+    end
 end
 
 always_ff @(posedge btn) begin
