@@ -56,11 +56,7 @@ always_ff @(posedge baud_clk or negedge rst) begin
         midi_tx <= midi_out[29];
         midi_out <= midi_out << 1;
         bits_cnt <= bits_cnt - 1;
-
-        if (btn_pressed)
-            btn_reset <= 1;
-        else
-            btn_reset <= 0;
+        btn_reset <= btn_pressed ? 1 : 0;
     end
     else if (btn_pressed && bits_cnt == 0) begin
         midi_out <= {1'b1, 8'b0001_0001, 1'b0,
