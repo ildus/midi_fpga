@@ -1,7 +1,7 @@
 `timescale 1ns/1ns
 
 module test();
-	logic rst, clk, btn, led, midi_tx;
+	logic rst, clk, btn, led1, led2, midi_tx;
 
 	initial begin
 		$printtimescale(test);
@@ -15,5 +15,5 @@ module test();
 	end
 	always #10 clk = ~clk;
 
-	midi_ctrl #(.BAUD_CNT_HALF(32)) ctrl (rst, clk, btn, led, midi_tx);
+	midi_ctrl #(.BAUD_CNT_HALF(32)) ctrl (rst, clk, btn, led1, led2, midi_tx);
 endmodule

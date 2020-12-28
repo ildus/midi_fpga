@@ -11,25 +11,26 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
     input logic rst,
     input logic clk,
     input logic btn,
-    output logic led,
-    output logic midi_tx
+    output logic led1 = 1,
+    output logic led2 = 0,
+    output logic midi_tx = 0
 );
 
-localparam STATUS = 4'hC; // CC message
+localparam STATUS = 4'hB; // CC message
 localparam CHANNEL = 4'h0; // channel 0
 localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
 
 // protocol
-logic baud_clk;
+logic baud_clk = 0;
 logic [5:0] bits_cnt;
-logic [12:0] clk_cnt;
-logic [29:0] midi_out;
+logic [12:0] clk_cnt = 0;
+logic [29:0] midi_out = 0;
 
 //midi
-logic [7:0] status;
-logic [7:0] data1;
-logic [7:0] data2;
+logic [7:0] status = 0;
+logic [7:0] data1 = 0;
+logic [7:0] data2 = 0;
 
 // buttons
 logic btn_pressed = 0;
@@ -62,27 +63,29 @@ end
 
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
-        led <= 0;
+        led1 <= 0;
+        led2 <= 1;
         bits_cnt <= 0;
-        midi_tx <= 0;
+        midi_tx <= 1;
         midi_out <= 0;
     end
     else if (bits_cnt != 0) begin
-        led <= 1;
-        midi_tx <= midi_out[29];
-        midi_out <= midi_out << 1;
+        midi_tx <= midi_out[0];
+        midi_out <= {1'b0, midi_out[29:1]};
         bits_cnt <= bits_cnt - 1;
         btn_reset <= btn_pressed ? 1 : 0;
     end
     else if (btn_pressed && bits_cnt == 0) begin
-        midi_out <= {1'b1, status, 1'b0,
-                     1'b1, data1,  1'b0,
-                     1'b1, data2,  1'b0};
+        led1 <= led2;
+        led2 <= led1;
+
+        midi_out <= {1'b1, data2, 1'b0,
+                     1'b1, data1, 1'b0,
+                     1'b1, status, 1'b0};
         bits_cnt <= 5'd30;
     end
     else begin
-        led <= 0;
-        midi_tx <= 0;
+        midi_tx <= 1;
     end
 end
 
