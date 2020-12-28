@@ -11,7 +11,6 @@ module test();
 		#10 rst = 0;
         #20 rst = 1;
 		#1000 btn = 1;
-		#2000 btn = 0;
 		#200000 $finish;
 	end
 	always #10 clk = ~clk;

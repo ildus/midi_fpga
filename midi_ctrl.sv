@@ -23,7 +23,9 @@ logic [7:0] data1;
 logic [7:0] data2;
 logic [12:0] clk_cnt;
 logic [29:0] midi_out;
-logic btn_pressed;
+
+logic btn_pressed = 0;
+logic btn_reset;
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -34,17 +36,16 @@ always_ff @(posedge clk or negedge rst) begin
         clk_cnt <= 0;
         baud_clk <= ~baud_clk;
     end
-    else
+    else begin
         clk_cnt <= clk_cnt + 1;
+    end
 end
 
-always_ff @(posedge clk or posedge btn or negedge rst) begin
-    if (!rst)
+always_ff @(posedge btn or posedge btn_reset) begin
+    if (btn_reset)
         btn_pressed <= 0;
-    else if (btn)
+    else
         btn_pressed <= 1;
-    else if (btn_pressed && bits_cnt != 0)
-        btn_pressed <= 0;
 end
 
 always_ff @(posedge baud_clk or negedge rst) begin
@@ -52,12 +53,14 @@ always_ff @(posedge baud_clk or negedge rst) begin
         led <= 0;
         bits_cnt <= 0;
         midi_tx <= 0;
+        btn_wait <= 1; // wait for btn click
     end
     else if (bits_cnt != 0) begin
         led <= 1;
         midi_tx <= midi_out[29];
         midi_out <= midi_out << 1;
         bits_cnt <= bits_cnt - 1;
+        btn_reset <= 0;
     end
     else if (btn_pressed && bits_cnt == 0) begin
         status <= 8'b0001_0001;
@@ -67,6 +70,7 @@ always_ff @(posedge baud_clk or negedge rst) begin
                      1'b1, data1,  1'b0,
                      1'b1, data2,  1'b0};
         bits_cnt <= 30;
+        btn_reset <= 1; // we got the data, time to reset button
     end
     else begin
         led <= 0;

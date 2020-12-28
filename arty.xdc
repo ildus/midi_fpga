@@ -15,7 +15,7 @@ set_property PACKAGE_PIN C2 [get_ports {rst}]
 set_property IOSTANDARD LVCMOS33 [get_ports {rst}]
 
 ## MIDI out
-set_property PACKAGE_PIN A0 [get_ports {midi_tx}]
+set_property PACKAGE_PIN A1 [get_ports {midi_tx}]
 set_property IOSTANDARD LVCMOS33 [get_ports {midi_tx}]
 
 ## Clocks

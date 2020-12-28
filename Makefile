@@ -1,6 +1,6 @@
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 current_dir := $(patsubst %/,%,$(dir $(mkfile_path)))
-TOP:=top
+TOP:=midi_ctrl
 VERILOG:=${current_dir}/midi_ctrl.sv
 DEVICE  := xc7a50t_test
 BITSTREAM_DEVICE := artix7
