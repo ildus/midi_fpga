@@ -1,3 +1,11 @@
+/* MIDI Controller.
+*
+* Timing details:
+   We should send one bit each 32 usec (1 sec  / 31250 ).
+   in 32 usec - 32000 nsec - (32000nsec / 10nsec) - 3200 ticks,
+   which gives us 320usec for 10 bits per packet,
+   16 usec for baud_clk going up and 16 usec for going down.
+*/
 module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
 (
     input logic rst,
@@ -7,19 +15,23 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
     output logic midi_tx
 );
 
-/* we should send one bit each 32 usec (1 sec  / 31250 ).
-   in 32 usec - 32000 nsec - (32000nsec / 10nsec) - 3200 ticks,
-   which gives us 320usec for 10 bits per packet,
-   16 usec for baud_clk going up and 16 usec for going down
-*/
+localparam STATUS = 4'hC; // CC message
+localparam CHANNEL = 4'h0; // channel 0
+localparam FIRST_CC_MSG = 8'd46;
+localparam CC_VALUE = 8'b0111_1111;
 
+// protocol
 logic baud_clk;
-//logic [2:0] command; // upper 4 bits of status, MSB is always 1
-//logic [3:0] channel; // lower 4 bits of status
 logic [5:0] bits_cnt;
 logic [12:0] clk_cnt;
 logic [29:0] midi_out;
 
+//midi
+logic [7:0] status;
+logic [7:0] data1;
+logic [7:0] data2;
+
+// buttons
 logic btn_pressed = 0;
 logic btn_reset = 0;
 
@@ -40,8 +52,12 @@ end
 always_ff @(posedge btn or posedge btn_reset) begin
     if (btn_reset == 1)
         btn_pressed <= 0;
-    else
+    else begin
+        status <= {STATUS, CHANNEL};
+        data1 <= FIRST_CC_MSG + 0;
+        data2 <= CC_VALUE;
         btn_pressed <= 1;
+    end
 end
 
 always_ff @(posedge baud_clk or negedge rst) begin
@@ -59,9 +75,9 @@ always_ff @(posedge baud_clk or negedge rst) begin
         btn_reset <= btn_pressed ? 1 : 0;
     end
     else if (btn_pressed && bits_cnt == 0) begin
-        midi_out <= {1'b1, 8'b0001_0001, 1'b0,
-                     1'b1, 8'b0011_0011,  1'b0,
-                     1'b1, 8'b0111_0111,  1'b0};
+        midi_out <= {1'b1, status, 1'b0,
+                     1'b1, data1,  1'b0,
+                     1'b1, data2,  1'b0};
         bits_cnt <= 5'd30;
     end
     else begin
