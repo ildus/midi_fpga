@@ -1,5 +1,5 @@
 create_project -force -name top -part xc7a35t
-add_files top.v
+add_files top.sv
 read_xdc top.xdc
 # (script_after_read placeholder)
 synth_design -top top

@@ -15,5 +15,5 @@ module test();
 	end
 	always #10 clk = ~clk;
 
-	midi_ctrl #(.BAUD_CNT_HALF(32)) ctrl (rst, clk, btn1, btn2, btn3, btn4, led1, led2, midi_tx);
+	top #(.BAUD_CNT_HALF(32)) ctrl (rst, clk, btn1, btn2, btn3, btn4, led1, led2, midi_tx);
 endmodule

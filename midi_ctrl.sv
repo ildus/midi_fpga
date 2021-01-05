@@ -6,7 +6,7 @@
    which gives us 320usec for 10 bits per packet,
    16 usec for baud_clk going up and 16 usec for going down.
 */
-module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
+module top #(parameter BAUD_CNT_HALF = 3200 / 2)
 (
     input logic rst,
     input logic clk,
@@ -42,6 +42,7 @@ logic btn2_pressed = 0;
 logic btn3_pressed = 0;
 logic btn4_pressed = 0;
 logic btn_reset = 0;
+logic [3:0] btn;
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -57,48 +58,51 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-always_ff @(posedge btn1) begin
-    btn1_pressed <= btn1;
+always_ff @(posedge clk) begin
+    if (btn1) begin
+        btn <= 4'b1000;
+    end
+    else if (btn2) begin
+        btn <= 4'b0100;
+    end
+    else if (btn3) begin
+        btn <= 4'b0010;
+    end
+    else if (btn4) begin
+        btn <= 4'b0001;
+    end
 end
 
-always_ff @(posedge btn2) begin
-    btn2_pressed <= btn2;
-end
-
-always_ff @(posedge btn3) begin
-    btn3_pressed <= btn3;
-end
-
-always_ff @(posedge btn4) begin
-    btn4_pressed <= btn4;
-end
-
-always_latch begin
+always @(*) begin
     if (btn_reset)
         btn_pressed = 0;
-    else if (btn1_pressed) begin
-        status = {STATUS, CHANNEL};
-        data1 = FIRST_CC_MSG + 0;
-        data2 = CC_VALUE;
-        btn_pressed = 1;
-    end
-    else if (btn2_pressed) begin
-        btn_pressed = 1;
-        status = {STATUS, CHANNEL};
-        data1 = FIRST_CC_MSG + 1;
-        data2 = CC_VALUE;
-    end
-    else if (btn3_pressed) begin
-        status = {STATUS, CHANNEL};
-        data1 = FIRST_CC_MSG + 3;
-        data2 = CC_VALUE;
-        btn_pressed = 1;
-    end
-    else if (btn4_pressed) begin
-        status = {STATUS, CHANNEL};
-        data1 = FIRST_CC_MSG + 4;
-        data2 = CC_VALUE;
-        btn_pressed = 1;
+    else begin
+        case (btn)
+            4'b1000: begin
+                status = {STATUS, CHANNEL};
+                data1 = FIRST_CC_MSG + 0;
+                data2 = CC_VALUE;
+                btn_pressed = 1;
+            end
+            4'b0100: begin
+                status = {STATUS, CHANNEL};
+                data1 = FIRST_CC_MSG + 0;
+                data2 = CC_VALUE + 1;
+                btn_pressed = 1;
+            end
+            4'b0010: begin
+                status = {STATUS, CHANNEL};
+                data1 = FIRST_CC_MSG + 0;
+                data2 = CC_VALUE + 2;
+                btn_pressed = 1;
+            end
+            4'b0001: begin
+                status = {STATUS, CHANNEL};
+                data1 = FIRST_CC_MSG + 0;
+                data2 = CC_VALUE + 3;
+                btn_pressed = 1;
+            end
+        endcase
     end
 end
 

@@ -15,14 +15,14 @@ all: ${BUILDDIR}/top.bit
 ${BUILDDIR}:
 	mkdir -p ${BUILDDIR}
 
-${BUILDDIR}/top.bit: ${BUILDDIR}/top.v ${XDC}
+${BUILDDIR}/top.bit: ${BUILDDIR}/top.sv ${XDC} build.tcl build_top.sh
 	cp ${XDC} ${BUILDDIR}/top.xdc
 	cp build_top.sh ${BUILDDIR}/
 	cp build.tcl ${BUILDDIR}/
 	cd ${BUILDDIR} && ${SHELL} build_top.sh
 
-${BUILDDIR}/top.v: ${BUILDDIR}/a.out ${XDC}
-	cp ${SOURCES} $@
+${BUILDDIR}/top.sv: ${BUILDDIR}/a.out ${XDC}
+	cat ${SOURCES} > $@
 	#yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
 
 simulation: ${BUILDDIR}/a.out
