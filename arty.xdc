@@ -9,8 +9,14 @@ set_property PACKAGE_PIN J5 [get_ports {led2}]
 set_property IOSTANDARD LVCMOS33 [get_ports {led2}]
 
 ## Buttons
-set_property PACKAGE_PIN D9 [get_ports {btn}]
-set_property IOSTANDARD LVCMOS33 [get_ports {btn}]
+set_property PACKAGE_PIN D9 [get_ports {btn1}]
+set_property IOSTANDARD LVCMOS33 [get_ports {btn1}]
+set_property PACKAGE_PIN C9 [get_ports {btn2}]
+set_property IOSTANDARD LVCMOS33 [get_ports {btn2}]
+set_property PACKAGE_PIN B9 [get_ports {btn3}]
+set_property IOSTANDARD LVCMOS33 [get_ports {btn3}]
+set_property PACKAGE_PIN B8 [get_ports {btn4}]
+set_property IOSTANDARD LVCMOS33 [get_ports {btn4}]
 
 ## Reset Button
 set_property PACKAGE_PIN C2 [get_ports {rst}]

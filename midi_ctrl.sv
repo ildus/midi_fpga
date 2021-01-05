@@ -10,7 +10,10 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
 (
     input logic rst,
     input logic clk,
-    input logic btn,
+    input logic btn1,
+    input logic btn2,
+    input logic btn3,
+    input logic btn4,
     output logic led1 = 1,
     output logic led2 = 0,
     output logic midi_tx = 0
@@ -34,6 +37,10 @@ logic [7:0] data2 = 0;
 
 // buttons
 logic btn_pressed = 0;
+logic btn1_pressed = 0;
+logic btn2_pressed = 0;
+logic btn3_pressed = 0;
+logic btn4_pressed = 0;
 logic btn_reset = 0;
 
 always_ff @(posedge clk or negedge rst) begin
@@ -50,14 +57,48 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-always_ff @(posedge btn or posedge btn_reset) begin
-    if (btn_reset == 1)
-        btn_pressed <= 0;
-    else begin
-        status <= {STATUS, CHANNEL};
-        data1 <= FIRST_CC_MSG + 0;
-        data2 <= CC_VALUE;
-        btn_pressed <= 1;
+always_ff @(posedge btn1) begin
+    btn1_pressed <= btn1;
+end
+
+always_ff @(posedge btn2) begin
+    btn2_pressed <= btn2;
+end
+
+always_ff @(posedge btn3) begin
+    btn3_pressed <= btn3;
+end
+
+always_ff @(posedge btn4) begin
+    btn4_pressed <= btn4;
+end
+
+always_latch begin
+    if (btn_reset)
+        btn_pressed = 0;
+    else if (btn1_pressed) begin
+        status = {STATUS, CHANNEL};
+        data1 = FIRST_CC_MSG + 0;
+        data2 = CC_VALUE;
+        btn_pressed = 1;
+    end
+    else if (btn2_pressed) begin
+        btn_pressed = 1;
+        status = {STATUS, CHANNEL};
+        data1 = FIRST_CC_MSG + 1;
+        data2 = CC_VALUE;
+    end
+    else if (btn3_pressed) begin
+        status = {STATUS, CHANNEL};
+        data1 = FIRST_CC_MSG + 3;
+        data2 = CC_VALUE;
+        btn_pressed = 1;
+    end
+    else if (btn4_pressed) begin
+        status = {STATUS, CHANNEL};
+        data1 = FIRST_CC_MSG + 4;
+        data2 = CC_VALUE;
+        btn_pressed = 1;
     end
 end
 
