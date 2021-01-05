@@ -16,13 +16,18 @@ After that you can compile and upload the bitstream to the connected device:
 ```
 source activate_env.sh
 make
-source upload_bit.sh
 ```
 
 Another way of uploading is:
 
 ```
-xc3sprog -c nexys4 build/arty_35/midi_ctrl.bit
+make upload
+```
+
+Or:
+
+```
+xc3sprog -c nexys4 build/top.bit
 ```
 
 Tested on Arch Linux.

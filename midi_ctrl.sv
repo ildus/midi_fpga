@@ -10,10 +10,7 @@ module top #(parameter BAUD_CNT_HALF = 3200 / 2)
 (
     input logic rst,
     input logic clk,
-    input logic btn1,
-    input logic btn2,
-    (* clock_buffer_type="none" *) input logic btn3,
-    (* clock_buffer_type="none" *) input logic btn4,
+    input logic btn,
     output logic led1 = 1,
     output logic led2 = 0,
     output logic midi_tx = 0
@@ -37,12 +34,7 @@ logic [7:0] data2 = 0;
 
 // buttons
 logic btn_pressed = 0;
-logic btn1_pressed = 0;
-logic btn2_pressed = 0;
-logic btn3_pressed = 0;
-logic btn4_pressed = 0;
 logic btn_reset = 0;
-logic [3:0] btn;
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -58,51 +50,14 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-always_ff @(posedge clk) begin
-    if (btn1) begin
-        btn <= 4'b1000;
-    end
-    else if (btn2) begin
-        btn <= 4'b0100;
-    end
-    else if (btn3) begin
-        btn <= 4'b0010;
-    end
-    else if (btn4) begin
-        btn <= 4'b0001;
-    end
-end
-
-always @(*) begin
-    if (btn_reset)
-        btn_pressed = 0;
+always_ff @(posedge btn or posedge btn_reset) begin
+    if (btn_reset == 1)
+        btn_pressed <= 0;
     else begin
-        case (btn)
-            4'b1000: begin
-                status = {STATUS, CHANNEL};
-                data1 = FIRST_CC_MSG + 0;
-                data2 = CC_VALUE;
-                btn_pressed = 1;
-            end
-            4'b0100: begin
-                status = {STATUS, CHANNEL};
-                data1 = FIRST_CC_MSG + 0;
-                data2 = CC_VALUE + 1;
-                btn_pressed = 1;
-            end
-            4'b0010: begin
-                status = {STATUS, CHANNEL};
-                data1 = FIRST_CC_MSG + 0;
-                data2 = CC_VALUE + 2;
-                btn_pressed = 1;
-            end
-            4'b0001: begin
-                status = {STATUS, CHANNEL};
-                data1 = FIRST_CC_MSG + 0;
-                data2 = CC_VALUE + 3;
-                btn_pressed = 1;
-            end
-        endcase
+        status <= {STATUS, CHANNEL};
+        data1 <= FIRST_CC_MSG + 0;
+        data2 <= CC_VALUE;
+        btn_pressed <= 1;
     end
 end
 

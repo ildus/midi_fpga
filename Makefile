@@ -34,3 +34,6 @@ ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 
 clean:
 	rm -rf ${BUILDDIR}
+
+upload:
+	openocd -f env/symbiflow/${ARCH}/conda/envs/${ARCH}/share/openocd/scripts/board/digilent_arty.cfg -c "init; pld load 0 ${BUILDDIR}/top.bit; exit"
