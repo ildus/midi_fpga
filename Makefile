@@ -22,7 +22,8 @@ ${BUILDDIR}/top.bit: ${BUILDDIR}/top.v ${XDC}
 	cd ${BUILDDIR} && ${SHELL} build_top.sh
 
 ${BUILDDIR}/top.v: ${BUILDDIR}/a.out ${XDC}
-	yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
+	cp ${SOURCES} $@
+	#yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
 
 simulation: ${BUILDDIR}/a.out
 

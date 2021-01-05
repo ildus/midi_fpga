@@ -1,4 +1,4 @@
-create_project -force -name top -part xc7a35tcsg324-1
+create_project -force -name top -part xc7a35t
 add_files top.v
 read_xdc top.xdc
 # (script_after_read placeholder)

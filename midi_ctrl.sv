@@ -12,8 +12,8 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
     input logic clk,
     input logic btn1,
     input logic btn2,
-    input logic btn3,
-    input logic btn4,
+    (* clock_buffer_type="none" *) input logic btn3,
+    (* clock_buffer_type="none" *) input logic btn4,
     output logic led1 = 1,
     output logic led2 = 0,
     output logic midi_tx = 0
