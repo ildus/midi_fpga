@@ -6,7 +6,7 @@
    which gives us 320usec for 10 bits per packet,
    16 usec for baud_clk going up and 16 usec for going down.
 */
-module top #(parameter BAUD_CNT_HALF = 3200 / 2)
+module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2)
 (
     input logic rst,
     input logic clk,
@@ -22,7 +22,7 @@ localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
 
 // protocol
-logic baud_clk = 0;
+logic baud_clk;
 logic [5:0] bits_cnt;
 logic [12:0] clk_cnt = 0;
 logic [29:0] midi_out = 0;
@@ -33,8 +33,15 @@ logic [7:0] data1 = 0;
 logic [7:0] data2 = 0;
 
 // buttons
-logic btn_pressed = 0;
-logic btn_reset = 0;
+logic cmd_set = 0;
+logic btn_pressed;
+logic cmd_reset = 0;
+
+debounce btn_debouncer (clk, rst, btn, btn_pressed);
+
+initial begin
+    baud_clk = 0;
+end
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -50,14 +57,15 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-always_ff @(posedge btn or posedge btn_reset) begin
-    if (btn_reset == 1)
-        btn_pressed <= 0;
+always_ff @(posedge btn_pressed or posedge cmd_reset) begin
+    if (cmd_reset) begin
+        cmd_set <= 0;
+    end
     else begin
         status <= {STATUS, CHANNEL};
         data1 <= FIRST_CC_MSG + 0;
         data2 <= CC_VALUE;
-        btn_pressed <= 1;
+        cmd_set <= 1;
     end
 end
 
@@ -68,14 +76,15 @@ always_ff @(posedge baud_clk or negedge rst) begin
         bits_cnt <= 0;
         midi_tx <= 1;
         midi_out <= 0;
+        cmd_reset <= 0;
     end
     else if (bits_cnt != 0) begin
         midi_tx <= midi_out[0];
         midi_out <= {1'b0, midi_out[29:1]};
         bits_cnt <= bits_cnt - 1;
-        btn_reset <= btn_pressed ? 1 : 0;
+        cmd_reset <= cmd_set ? 1 : 0;
     end
-    else if (btn_pressed && bits_cnt == 0) begin
+    else if (cmd_set && bits_cnt == 0) begin
         led1 <= led2;
         led2 <= led1;
 

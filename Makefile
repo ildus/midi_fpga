@@ -1,6 +1,6 @@
 PRJNAME  = midi_ctrl
 TOPLEVEL = midi_ctrl
-SOURCES  = midi_ctrl.sv
+SOURCES  = midi_ctrl.sv debounce.v
 SOURCES_TB = midi_ctrl_tb.sv
 XDC      = arty.xdc
 
@@ -22,10 +22,11 @@ ${BUILDDIR}/top.bit: ${BUILDDIR}/top.sv ${XDC} build.tcl build_top.sh
 	cd ${BUILDDIR} && ${SHELL} build_top.sh
 
 ${BUILDDIR}/top.sv: ${BUILDDIR}/a.out ${XDC}
-	cat ${SOURCES} > $@
-	#yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
+	#cat ${SOURCES} > $@
+	yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
 
-simulation: ${BUILDDIR}/a.out
+sim: ${BUILDDIR}/a.out
+	cd ${BUILDDIR} && vvp a.out && gtkwave test.vcd
 
 ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 	cp ${SOURCES} ${BUILDDIR}/
