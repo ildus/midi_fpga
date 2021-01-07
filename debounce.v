@@ -3,12 +3,12 @@
 // Small Footprint Button Debouncer
 
 `timescale 1 ns / 100 ps
-module  debounce
+module debounce_internal #(parameter CNT = 21)
 	(
 	input       clk, n_reset, button_in,    // inputs
 	output reg 	button_out = 0					// output
 	);
-	parameter N = 21 ;      // counter should fill in 10ms in 100Mhz
+	parameter N = CNT ;      // counter should fill in 10ms in 100Mhz
 
 	reg  [N-1 : 0]	q_reg;  // timing regs
 	reg  [N-1 : 0]	q_next;
@@ -21,7 +21,7 @@ module  debounce
 	assign  q_add = ~(q_reg[N-1]);	    // add to counter when q_reg msb is equal to 0
 
     // combo counter to manage q_next
-	always @ ( q_reset, q_add, q_reg)
+	always @ (*)
 		begin
 			case( {q_reset , q_add})
 				2'b00 :
@@ -60,3 +60,33 @@ module  debounce
 		end
 
 endmodule
+
+// btn_raised will be set only on clock period
+module debounce #(parameter DEBOUNCE_CNT=21) (
+    input logic clk,
+    input logic rst,
+    input logic btn,
+    output logic raised
+);
+    logic oldval = 0;
+    logic pressed;
+
+    debounce_internal #(.CNT(DEBOUNCE_CNT)) deby (clk, rst, btn, pressed);
+
+    always_ff @(posedge clk or negedge rst) begin
+        if (!rst) begin
+            raised <= 0;
+            oldval <= 0;
+        end
+        else begin
+            if (oldval != pressed && pressed) begin
+                raised <= 1;
+            end
+            else
+                raised <= 0;
+
+            oldval <= pressed;
+        end
+    end
+endmodule
+

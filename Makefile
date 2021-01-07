@@ -9,6 +9,7 @@ ARCH     = xc7
 #PART     = xc7a100tcsg324-1
 #PART 	  = xc7a35ticsg324-1L
 BUILDDIR = build
+VIVADO ?= vivado
 
 all: ${BUILDDIR}/top.bit
 
@@ -19,11 +20,11 @@ ${BUILDDIR}/top.bit: ${BUILDDIR}/top.sv ${XDC} build.tcl build_top.sh
 	cp ${XDC} ${BUILDDIR}/top.xdc
 	cp build_top.sh ${BUILDDIR}/
 	cp build.tcl ${BUILDDIR}/
-	cd ${BUILDDIR} && ${SHELL} build_top.sh
+	cd ${BUILDDIR} && VIVADO=${VIVADO} ${SHELL} build_top.sh
 
 ${BUILDDIR}/top.sv: ${BUILDDIR}/a.out ${XDC}
 	#cat ${SOURCES} > $@
-	yosys -p "read_verilog -sv ${SOURCES}; synth_xilinx -flatten -nobram -arch $(ARCH) -top $(TOPLEVEL); rename -top top; write_verilog $@"
+	yosys -p "read_verilog -sv ${SOURCES}; synth -flatten -lut -abc9 -auto-top; rename -top top; write_verilog $@"
 
 sim: ${BUILDDIR}/a.out
 	cd ${BUILDDIR} && vvp a.out && gtkwave test.vcd
