@@ -4,10 +4,7 @@ SOURCES  = midi_ctrl.sv debounce.v
 SOURCES_TB = midi_ctrl_tb.sv
 XDC      = arty.xdc
 
-# Don't change anything below this line
 ARCH     = xc7
-#PART     = xc7a100tcsg324-1
-#PART 	  = xc7a35ticsg324-1L
 BUILDDIR = build
 VIVADO ?= vivado
 
