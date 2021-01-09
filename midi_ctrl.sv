@@ -14,8 +14,10 @@ module top #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 21)
     input logic btn2,
     input logic btn3,
     input logic btn4,
+    input logic midi_rx,
     output logic led1 = 1,
     output logic led2 = 0,
+    output logic led3 = 0,
     output logic midi_tx = 1
 );
 
@@ -30,11 +32,19 @@ logic [5:0] bits_cnt;
 logic [12:0] clk_cnt = 0;
 logic [29:0] midi_out = 0;
 
-//midi
+// midi out
 logic [7:0] status = 0;
 logic [7:0] data1 = 0;
 logic [7:0] data2 = 0;
 logic [7:0] cc_msg = 0;
+
+// midi in
+logic [7:0] status_in = 0;
+logic [7:0] data1_in = 0;
+logic [7:0] data2_in = 0;
+logic [5:0] midi_reading_pos = 0;
+logic [5:0] bits_cnt_in = 0;
+logic [7:0] midi_in = 0;
 
 // buttons
 logic cmd_set = 0;
@@ -43,6 +53,7 @@ logic btn1_raise;
 logic btn2_raise;
 logic btn3_raise;
 logic btn4_raise;
+logic btn_assigned = 1;
 
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, btn1, btn1_raise);
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
@@ -69,14 +80,22 @@ always @(posedge clk or negedge rst) begin
     end
     else begin
         case ({btn4_raise, btn3_raise, btn2_raise, btn1_raise})
-            4'b0001:
+            4'b0001: begin
                 cc_msg <= FIRST_CC_MSG + 0;
-            4'b0010:
+                btn_assigned <= 1;
+            end
+            4'b0010: begin
                 cc_msg <= FIRST_CC_MSG + 1;
-            4'b0100:
+                btn_assigned <= 1;
+            end
+            4'b0100: begin
                 cc_msg <= FIRST_CC_MSG + 2;
-            4'b1000:
+                btn_assigned <= 1;
+            end
+            4'b1000: begin
                 cc_msg <= FIRST_CC_MSG + 3;
+                btn_assigned <= 1;
+            end
             default:
                 cc_msg <= 0;
         endcase
@@ -99,6 +118,7 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
+// MIDI out logic
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
         led1 <= 0;
@@ -130,5 +150,51 @@ always_ff @(posedge baud_clk or negedge rst) begin
         midi_tx <= 1;
     end
 end
+
+// MIDI in logic
+always_ff @(posedge baud_clk or negedge rst) begin
+    if (!rst) begin
+        midi_cmd_completed <= 0;
+        midi_reading_pos <= 0;
+    end
+    else if (midi_reading_pos != 0) begin
+        // continue reading other bits
+
+        midi_in <= {midi_rx, midi_in[7:1]};
+
+        // move current byte to destination
+        if (midi_reading_pos == 9 && midi_rx == 1) begin
+            if (midi_in[7]) begin
+                // MSB == 1 means status byte
+                status_in <= midi_in;
+                midi_cmd_completed <= 1;
+                bits_cnt_in <= 10;
+            end
+            else if (data1_in == 0) begin
+                data1_in <= midi_in;
+                bits_cnt_in <= 20;
+            end
+            else begin
+                data2_in <= midi_in;
+                bits_cnt_in <= 30;
+            end
+        end
+
+        // that was stop bit, finish reading
+        if (midi_reading_pos == 9)
+            midi_reading_pos <= 0;
+        else
+            midi_reading_pos <= midi_reading_pos + 1;
+    end
+    else if (midi_rx != 0) begin
+        // start reading one byte
+        midi_in <= 0;
+
+        midi_cmd_completed <= 0;
+        midi_reading_pos <= 1;
+    end
+end
+
+assign led3 = midi_cmd_completed && !btn_assigned;
 
 endmodule
