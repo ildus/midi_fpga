@@ -6,7 +6,6 @@ XDC      = arty.xdc
 
 ARCH     = xc7
 BUILDDIR = build
-VIVADO ?= vivado
 
 all: ${BUILDDIR}/top.bit
 
@@ -29,6 +28,7 @@ sim: ${BUILDDIR}/a.out
 ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 	cp ${SOURCES} ${BUILDDIR}/
 	cp ${SOURCES_TB} ${BUILDDIR}/
+	cd ${BUILDDIR} && xvlog -sv ${SOURCES}
 	cd ${BUILDDIR} && iverilog -g2012 -I. ${SOURCES} ${SOURCES_TB}
 
 clean:
