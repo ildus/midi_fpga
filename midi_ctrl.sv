@@ -6,7 +6,7 @@
    which gives us 320usec for 10 bits per packet,
    16 usec for baud_clk going up and 16 usec for going down.
 */
-module top #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 21)
+module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 21)
 (
     input logic rst,
     input logic clk,
@@ -15,10 +15,9 @@ module top #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 21)
     input logic btn3,
     input logic btn4,
     input logic midi_rx,
-    output logic led1 = 1,
-    output logic led2 = 0,
-    output logic led3,
-    output logic midi_tx = 1
+    output logic midi_tx,
+    output logic led1,
+    output logic led2
 );
 
 localparam STATUS = 4'hB; // CC message
@@ -27,15 +26,14 @@ localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
 
 // protocol
-logic baud_clk = 0;
 logic [5:0] bits_cnt;
 logic [12:0] clk_cnt = 0;
 logic [29:0] midi_out = 0;
 
-logic [7:0] btn1_status = {STATUS, CHANNEL};
-logic [7:0] btn1_data1 = FIRST_CC_MSG;
-logic [7:0] btn1_data2 = CC_VALUE;
-logic [7:0] btn1_bits_cnt = 30;
+logic [7:0] btn1_status;
+logic [7:0] btn1_data1;
+logic [7:0] btn1_data2;
+logic [7:0] btn1_bits_cnt;
 
 // midi in
 logic [7:0] status_in = 0;
@@ -44,10 +42,6 @@ logic [7:0] data2_in = 0;
 logic [5:0] midi_reading_pos = 0;
 logic [5:0] bits_cnt_in = 0;
 logic [7:0] midi_in = 0;
-
-// buttons
-logic cmd_set = 0;
-logic cmd_reset = 0;
 
 // raise will appear once
 logic btn1_raise;
@@ -60,25 +54,25 @@ debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d3 (clk, rst, btn3, btn3_raise);
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d4 (clk, rst, btn4, btn4_raise);
 
-always_ff @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        clk_cnt <= 0;
-        baud_clk <= 0;
-    end
-    else if (clk_cnt == BAUD_CNT_HALF - 1) begin
-        clk_cnt <= 0;
-        baud_clk <= ~baud_clk;
-    end
-    else begin
-        clk_cnt <= clk_cnt + 1;
-    end
+initial begin
+    btn1_status = {STATUS, CHANNEL};
+    btn1_data1 = FIRST_CC_MSG;
+    btn1_data2 = CC_VALUE;
+    btn1_bits_cnt = 30;
 end
 
 // midi out
-logic [7:0] status = 0;
-logic [7:0] data1 = 0;
-logic [7:0] data2 = 0;
-logic [7:0] cmd_bits_cnt = 0;
+logic [7:0] status;
+logic [7:0] data1;
+logic [7:0] data2;
+logic [7:0] cmd_bits_cnt;
+
+initial begin
+    status = 0;
+    data1 = 0;
+    data2 = 0;
+    cmd_bits_cnt = 0;
+end
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -119,6 +113,15 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
+// buttons
+logic cmd_set;
+logic cmd_reset;
+
+initial begin
+    cmd_set <= 0;
+    cmd_reset <= 0;
+end
+
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
         cmd_set <= 0;
@@ -132,11 +135,32 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
+logic baud_clk;
+
+initial begin
+    led1 = 0;
+    midi_tx = 1;
+    baud_clk = 0;
+end
+
 // MIDI out logic
+always_ff @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        clk_cnt <= 0;
+        baud_clk <= 0;
+    end
+    else if (clk_cnt == BAUD_CNT_HALF - 1) begin
+        clk_cnt <= 0;
+        baud_clk <= ~baud_clk;
+    end
+    else begin
+        clk_cnt <= clk_cnt + 1;
+    end
+end
+
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
         led1 <= 0;
-        led2 <= 1;
         bits_cnt <= 0;
         midi_tx <= 1;
         midi_out <= 0;
@@ -149,8 +173,7 @@ always_ff @(posedge baud_clk or negedge rst) begin
         cmd_reset <= 0;
     end
     else if (cmd_set && bits_cnt == 0) begin
-        led1 <= led2;
-        led2 <= led1;
+        led1 <= 1;
 
         // we're sending bits from LSB, so the structure constructed backwards
         midi_out <= {1'b1, data2, 1'b0,
@@ -160,12 +183,13 @@ always_ff @(posedge baud_clk or negedge rst) begin
         cmd_reset <= 1;
     end
     else begin
+        led1 <= 1;
         cmd_reset <= 0;
         midi_tx <= 1;
     end
 end
 
-logic [5:0] midi_in_bits = 0
+logic [5:0] midi_in_bits = 0;
 logic midi_cmd_completed = 0;
 
 // MIDI in logic
@@ -214,20 +238,31 @@ always_ff @(posedge baud_clk or negedge rst) begin
         midi_in_bits <= 1;
         midi_reading_pos <= 1;
         midi_cmd_completed <= 0;
+
+        // reset all the data, so they will not affect future value
+        status_in <= 0;
+        data1_in <= 0;
+        data2_in <= 0;
+        bits_cnt_in <= 0;
     end
     else begin
         // this will count to 31 and stop
         if (midi_in_bits != 0)
             midi_in_bits <= midi_in_bits + 1;
-        else if (midi_in_bits == 30)
+        else if (bits_cnt_in != 0 && midi_in_bits == 30)
             midi_cmd_completed <= 1;
     end
 end
 
-logic btn_assigned = 0;
-logic [1:0] midi_in_state = 0;
+logic btn_assigned;
+logic [1:0] midi_in_state;
 
-always led3 = (midi_in_state == 1);
+assign led2 = (midi_in_state == 1);
+
+initial begin
+    btn_assigned = 0;
+    midi_in_state = 0;
+end
 
 always @(*) begin
     if (!rst)

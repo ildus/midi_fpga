@@ -16,7 +16,7 @@ ${BUILDDIR}/top.bit: ${BUILDDIR}/top.sv ${XDC} build.tcl build_top.sh
 	cp ${XDC} ${BUILDDIR}/top.xdc
 	cp build_top.sh ${BUILDDIR}/
 	cp build.tcl ${BUILDDIR}/
-	cd ${BUILDDIR} && VIVADO=${VIVADO} ${SHELL} build_top.sh
+	cd ${BUILDDIR} && ${SHELL} build_top.sh
 
 ${BUILDDIR}/top.sv: ${BUILDDIR}/a.out ${XDC}
 	#cat ${SOURCES} > $@

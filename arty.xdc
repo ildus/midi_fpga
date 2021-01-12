@@ -20,3 +20,4 @@ set_property -dict { PACKAGE_PIN C2    IOSTANDARD LVCMOS33 } [get_ports { rst }]
 
 ## MIDI out
 set_property -dict { PACKAGE_PIN G13    IOSTANDARD LVCMOS33 } [get_ports { midi_tx }];
+set_property -dict { PACKAGE_PIN B11    IOSTANDARD LVCMOS33 } [get_ports { midi_rx }];
