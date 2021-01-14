@@ -12,8 +12,6 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     input logic clk,
     input logic btn1,
     input logic btn2,
-    input logic btn3,
-    input logic btn4,
     input logic midi_rx,
     output logic midi_tx,
     output logic led1,
@@ -35,6 +33,11 @@ logic [7:0] btn1_data1;
 logic [7:0] btn1_data2;
 logic [7:0] btn1_bits_cnt;
 
+logic [7:0] btn2_status;
+logic [7:0] btn2_data1;
+logic [7:0] btn2_data2;
+logic [7:0] btn2_bits_cnt;
+
 // midi in
 logic [7:0] status_in = 0;
 logic [7:0] data1_in = 0;
@@ -46,22 +49,28 @@ logic [7:0] midi_in = 0;
 // raise will appear once
 logic btn1_raise;
 logic btn2_raise;
-logic btn3_raise;
-logic btn4_raise;
+logic btn3_raise = 0;
+logic btn4_raise = 0;
 
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, btn1, btn1_raise);
 debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d3 (clk, rst, btn3, btn3_raise);
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d4 (clk, rst, btn4, btn4_raise);
+//debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d3 (clk, rst, btn3, btn3_raise);
+//debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d4 (clk, rst, btn4, btn4_raise);
 
+// default values for buttons
 initial begin
     btn1_status = {STATUS, CHANNEL};
     btn1_data1 = FIRST_CC_MSG;
     btn1_data2 = CC_VALUE;
     btn1_bits_cnt = 30;
+
+    btn2_status = {STATUS, CHANNEL};
+    btn2_data1 = FIRST_CC_MSG + 1;
+    btn2_data2 = CC_VALUE;
+    btn2_bits_cnt = 30;
 end
 
-// midi out
+// current values for MIDI OUT
 logic [7:0] status;
 logic [7:0] data1;
 logic [7:0] data2;
@@ -90,10 +99,10 @@ always @(posedge clk or negedge rst) begin
                 cmd_bits_cnt <= btn1_bits_cnt;
             end
             4'b0010: begin
-                status <= btn1_status;
-                data1 <= btn1_data1;
-                data2 <= btn1_data2;
-                cmd_bits_cnt <= btn1_bits_cnt;
+                status <= btn2_status;
+                data1 <= btn2_data1;
+                data2 <= btn2_data2;
+                cmd_bits_cnt <= btn2_bits_cnt;
             end
             4'b0100: begin
                 status <= btn1_status;
@@ -191,6 +200,22 @@ end
 
 logic [5:0] midi_in_bits = 0;
 logic midi_cmd_completed = 0;
+logic [1:0] midi_in_state;
+logic btn_assigned = 0;
+
+assign led2 = (midi_in_state == 1);
+
+always @(*) begin
+    if (!rst)
+        midi_in_state = 0;
+    else if (midi_cmd_completed && !btn_assigned)
+        midi_in_state = 1;
+    else if (midi_cmd_completed && btn_assigned)
+        midi_in_state = 2;
+    else
+        midi_in_state = 0;
+end
+
 
 // MIDI in logic
 always_ff @(posedge baud_clk or negedge rst) begin
@@ -251,28 +276,9 @@ always_ff @(posedge baud_clk or negedge rst) begin
             midi_in_bits <= midi_in_bits + 1;
         else if (bits_cnt_in != 0 && midi_in_bits == 30)
             midi_cmd_completed <= 1;
+        else if (midi_in_state == 2)
+            midi_cmd_completed <= 0;
     end
-end
-
-logic btn_assigned;
-logic [1:0] midi_in_state;
-
-assign led2 = (midi_in_state == 1);
-
-initial begin
-    btn_assigned = 0;
-    midi_in_state = 0;
-end
-
-always @(*) begin
-    if (!rst)
-        midi_in_state = 0;
-    else if (midi_cmd_completed && !btn_assigned)
-        midi_in_state = 1;
-    else if (midi_cmd_completed && btn_assigned)
-        midi_in_state = 2;
-    else
-        midi_in_state = 0;
 end
 
 always_ff @(posedge clk) begin
@@ -283,6 +289,13 @@ always_ff @(posedge clk) begin
         btn1_data1 <= data1_in;
         btn1_data2 <= data2_in;
         btn1_bits_cnt <= bits_cnt_in;
+        btn_assigned <= 1;
+    end
+    else if (midi_in_state == 1 && btn2_raise) begin
+        btn2_status <= status_in;
+        btn2_data1 <= data1_in;
+        btn2_data2 <= data2_in;
+        btn2_bits_cnt <= bits_cnt_in;
         btn_assigned <= 1;
     end
 end

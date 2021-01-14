@@ -1,0 +1,8 @@
+set_io clk		15
+set_io btn1		41
+set_io btn2		42
+set_io led1		40
+set_io led2		51
+set_io midi_rx	1
+set_io midi_tx	2
+set_io rst		3
