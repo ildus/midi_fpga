@@ -6,7 +6,7 @@
 module debounce_internal #(parameter CNT = 21)
 	(
 	input       clk, n_reset, button_in,    // inputs
-	output reg 	button_out					// output
+	output reg 	button_out = 0				// output
 	);
 	parameter N = CNT ;      // counter should fill in 10ms in 100Mhz
 
@@ -19,8 +19,6 @@ module debounce_internal #(parameter CNT = 21)
     // contenious assignment for counter control
 	assign q_reset = (DFF1  ^ DFF2);    // xor input flip flops to look for level chage to reset counter
 	assign  q_add = ~(q_reg[N-1]);	    // add to counter when q_reg msb is equal to 0
-
-    initial button_out = 0;
 
     // combo counter to manage q_next
 	always @ (*)
@@ -75,7 +73,7 @@ module debounce #(parameter DEBOUNCE_CNT=21) (
 
     debounce_internal #(.CNT(DEBOUNCE_CNT)) deby (clk, rst, btn, pressed);
 
-    always_ff @(posedge clk or negedge rst) begin
+    always @(posedge clk or negedge rst) begin
         if (!rst) begin
             raised <= 0;
             oldval <= 0;

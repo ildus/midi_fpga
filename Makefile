@@ -39,7 +39,7 @@ clean:
 	rm -rf ${BUILDDIR}
 
 upload_xc7: ${BUILDDIR_ARTY}/top.bit
-	openocd -f xc7/digilent_arty.cfg -c "init; pld load 0 ${BUILDDIR}/top.bit; exit"
+	openocd -f xc7/digilent_arty.cfg -c "init; pld load 0 ${BUILDDIR_ARTY}/top.bit; exit"
 
 upload_ice40: ${BUILDDIR_ICE40}/${PRJNAME}.bin
 	rm -f ${BUILDDIR_ICE40}/padded_binary
@@ -55,3 +55,6 @@ ${BUILDDIR_ICE40}/${PRJNAME}.asc: ${BUILDDIR_ICE40}/${PRJNAME}.json ${PCF}
 
 ${BUILDDIR_ICE40}/${PRJNAME}.json: ${BUILDDIR}/a.out
 	yosys -p "read_verilog -sv ${SOURCES}; synth_ice40 -top ${TOPLEVEL} -json $@"
+
+check:
+	+make -C tests SIM=icarus
