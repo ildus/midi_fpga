@@ -1,4 +1,4 @@
 /build
-/*.vcd
+*.vcd
 a.out
 /env
