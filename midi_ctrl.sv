@@ -18,6 +18,7 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     output logic led2
 );
 
+/* just some sample commands */
 localparam STATUS = 8'hB0; // CC message, channel 1
 localparam PC_MSG = 8'hC0; // PC message, channel 1
 localparam FIRST_CC_MSG = 8'd46;
@@ -241,15 +242,15 @@ end
 
 always_ff @(posedge clk) begin
     if (btn1_status == 0) begin
-        btn1_status = PC_MSG;
-        btn1_data1 = PC_VALUE1;
-        btn1_data2 = 0;
-        btn1_bits_cnt = 20;
+        btn1_status = STATUS;
+        btn1_data1 = FIRST_CC_MSG;
+        btn1_data2 = CC_VALUE;
+        btn1_bits_cnt = 30;
 
-        btn2_status = PC_MSG;
-        btn2_data1 = PC_VALUE2;
-        btn2_data2 = 0;
-        btn2_bits_cnt = 20;
+        btn2_status = STATUS;
+        btn2_data1 = FIRST_CC_MSG + 1;
+        btn2_data2 = CC_VALUE;
+        btn2_bits_cnt = 30;
     end
     else if (midi_in_state == 0)
         btn_assigned <= 0;

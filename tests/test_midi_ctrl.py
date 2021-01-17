@@ -53,6 +53,21 @@ async def send_command(dut, is_status=False, and_wait=False):
 
     return BinaryValue(bindata)
 
+async def read_midi_command(dut):
+    # wait for start bit
+    await FallingEdge(dut.midi_tx)
+    await FallingEdge(dut.baud_clk)
+
+    bindata = ''
+    for i in range(8):
+        await FallingEdge(dut.baud_clk)
+        bindata = str(dut.midi_tx.value) + bindata
+
+    # wait for stop bit
+    await FallingEdge(dut.baud_clk)
+    return BinaryValue(bindata)
+
+
 @cocotb.test()
 async def test_midi_in(dut):
     """ Test MIDI IN, only status byte """
@@ -160,3 +175,24 @@ async def test_btn_assign(dut):
     assert dut.btn1_data1 == data1
     assert dut.btn1_data2 == data2
     assert dut.btn1_bits_cnt.value == 30
+
+@cocotb.test()
+async def test_midi_out_on_button(dut):
+    await setup_dut(dut)
+
+    dut.btn1 <= False
+    await FallingEdge(dut.clk)
+    dut.btn1 <= True
+
+    bindata = ''
+    for i in range(8):
+        await FallingEdge(dut.baud_clk)
+        bindata = str(dut.midi_tx.value) + bindata
+
+    status = await read_midi_command(dut)
+    data1 = await read_midi_command(dut)
+    data2 = await read_midi_command(dut)
+
+    assert dut.btn1_status.value == status
+    assert dut.btn1_data1.value == data1
+    assert dut.btn1_data2.value == data2

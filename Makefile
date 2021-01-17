@@ -1,14 +1,15 @@
 PRJNAME  = midi_ctrl
 TOPLEVEL = midi_ctrl
 SOURCES  = midi_ctrl.sv debounce.v
-SOURCES_TB = midi_ctrl_tb.sv
 XDC      = xc7/arty.xdc
 PCF      = ice40/ice40hx1.pcf
 BUILDDIR = build
 BUILDDIR_ARTY = ${BUILDDIR}/arty
 BUILDDIR_ICE40 = ${BUILDDIR}/ice40
 
+.PHONY: all
 all: xc7 ice40
+
 xc7: ${BUILDDIR_ARTY}/top.bit
 ice40: ${BUILDDIR_ICE40}/${PRJNAME}.bin
 
@@ -31,12 +32,8 @@ sim: ${BUILDDIR}/a.out
 
 ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 	cp ${SOURCES} ${BUILDDIR}/
-	cp ${SOURCES_TB} ${BUILDDIR}/
 	cd ${BUILDDIR} && xvlog -sv ${SOURCES}
-	cd ${BUILDDIR} && iverilog -g2012 -I. ${SOURCES} ${SOURCES_TB}
-
-clean:
-	rm -rf ${BUILDDIR}
+	cd ${BUILDDIR} && iverilog -g2012 -I. ${SOURCES}
 
 upload_xc7: ${BUILDDIR_ARTY}/top.bit
 	openocd -f xc7/digilent_arty.cfg -c "init; pld load 0 ${BUILDDIR_ARTY}/top.bit; exit"
@@ -56,5 +53,10 @@ ${BUILDDIR_ICE40}/${PRJNAME}.asc: ${BUILDDIR_ICE40}/${PRJNAME}.json ${PCF}
 ${BUILDDIR_ICE40}/${PRJNAME}.json: ${BUILDDIR}/a.out
 	yosys -p "read_verilog -sv ${SOURCES}; synth_ice40 -top ${TOPLEVEL} -json $@"
 
+.PHONY: check
 check:
 	+make -C tests SIM=icarus
+
+.PHONY: clean
+clean:
+	rm -rf ${BUILDDIR}

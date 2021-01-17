@@ -5,7 +5,7 @@
 `timescale 1 ns / 100 ps
 module debounce_internal #(parameter CNT = 21)
 	(
-	input       clk, n_reset, button_in,    // inputs
+	input       clk, rst, button_in,    // inputs
 	output reg 	button_out = 0				// output
 	);
 	parameter N = CNT ;      // counter should fill in 10ms in 100Mhz
@@ -36,7 +36,7 @@ module debounce_internal #(parameter CNT = 21)
     // Flip flop inputs and q_reg update
 	always @ ( posedge clk )
 		begin
-			if(n_reset ==  1'b0)
+			if (!rst)
 				begin
 					DFF1 <= 1'b0;
 					DFF2 <= 1'b0;
