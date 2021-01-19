@@ -18,8 +18,25 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     output logic led2
 );
 
+localparam BUTTONS_CNT = 2;
+localparam MEMSIZE = BUTTONS_CNT * 4;
+
+logic we = 0;
+logic [7:0] smem [MEMSIZE - 1:0];
+logic mem_initialized[BUTTONS_CNT:1];
+logic [1:0] btn_index = 0;
+
+integer i;
+initial begin
+    for(i = 1; i <= BUTTONS_CNT; i++) begin
+        mem_initialized[i] <= 0;
+    end
+end
+
+logic btn_pressed = 0;
+
 /* just some sample commands */
-localparam STATUS = 8'hB0; // CC message, channel 1
+localparam CC_MSG = 8'hB0; // CC message, channel 1
 localparam PC_MSG = 8'hC0; // PC message, channel 1
 localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
@@ -27,19 +44,9 @@ localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
 
 // protocol
-logic [5:0] bits_cnt = 0;
+logic [7:0] bits_cnt = 0;
 logic [12:0] clk_cnt = 0;
 logic [29:0] midi_out = 0;
-
-logic [7:0] btn1_status = 0;
-logic [7:0] btn1_data1 = 0;
-logic [7:0] btn1_data2 = 0;
-logic [7:0] btn1_bits_cnt = 0;
-
-logic [7:0] btn2_status = 0;
-logic [7:0] btn2_data1 = 0;
-logic [7:0] btn2_data2 = 0;
-logic [7:0] btn2_bits_cnt = 0;
 
 // midi in
 logic [7:0] status_in = 0;
@@ -65,37 +72,6 @@ logic [7:0] status = 0;
 logic [7:0] data1 = 0;
 logic [7:0] data2 = 0;
 logic [7:0] cmd_bits_cnt = 0;
-
-logic btn_pressed = 0;
-
-always @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        status <= 0;
-        data1 <= 0;
-        data2 <= 0;
-        cmd_bits_cnt <= 0;
-    end
-    else begin
-        case ({btn2_raise, btn1_raise})
-            4'b01: begin
-                status <= btn1_status;
-                data1 <= btn1_data1;
-                data2 <= btn1_data2;
-                cmd_bits_cnt <= btn1_bits_cnt;
-                btn_pressed <= 1;
-            end
-            4'b10: begin
-                status <= btn2_status;
-                data1 <= btn2_data1;
-                data2 <= btn2_data2;
-                cmd_bits_cnt <= btn2_bits_cnt;
-                btn_pressed <= 1;
-            end
-            default:
-                btn_pressed <= 0;
-        endcase
-    end
-end
 
 // buttons
 logic cmd_set = 0;
@@ -180,6 +156,75 @@ always @(*) begin
         midi_in_state = 0;
 end
 
+always @(posedge clk) begin
+    if (midi_in_state == 0) begin
+        btn_assigned <= 0;
+    end
+    else if (midi_in_state == 1 && btn_index != 0) begin
+        btn_assigned <= 1;
+    end
+end
+
+always @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        btn_index <= 0;
+        we <= 0;
+    end
+    else begin
+        case ({btn2_raise, btn1_raise})
+            4'b01: begin
+                btn_index <= 1;
+                we <= (midi_in_state == 1);
+            end
+            4'b10: begin
+                btn_index <= 2;
+                we <= (midi_in_state == 1);
+            end
+            default: begin
+                btn_index <= 0;
+                we <= 0;
+            end
+        endcase
+    end
+end
+
+always @(posedge clk or negedge rst) begin
+    `define ADDR ((btn_index - 1) * 4)
+
+    if (!rst) begin
+        btn_pressed <= 0;
+        for (i = 1; i <= BUTTONS_CNT; i++)
+            mem_initialized[i] <= 0;
+    end
+    else if (btn_index != 0) begin
+        if (we) begin
+            smem[`ADDR] <= status_in;
+            smem[`ADDR + 1] <= data1_in;
+            smem[`ADDR + 2] <= data2_in;
+            smem[`ADDR + 3] <= bytes_cnt_in * 10;
+            btn_pressed <= 0;
+            mem_initialized[btn_index] <= 1;
+        end
+        else begin
+            if (!mem_initialized[btn_index]) begin
+                status <= CC_MSG;
+                data1 <= FIRST_CC_MSG + btn_index - 1;
+                data2 <= CC_VALUE;
+                cmd_bits_cnt <= 30;
+                btn_pressed <= 1;
+            end else begin
+                status <= smem[`ADDR];
+                data1 <= smem[`ADDR + 1];
+                data2 <= smem[`ADDR + 2];
+                cmd_bits_cnt <= smem[`ADDR + 3];
+                btn_pressed <= 1;
+            end
+        end
+    end
+    else begin
+        btn_pressed <= 0;
+    end
+end
 
 // MIDI in logic
 always_ff @(posedge baud_clk or negedge rst) begin
@@ -237,36 +282,6 @@ always_ff @(posedge baud_clk or negedge rst) begin
             midi_cmd_completed <= 1;
         else if (midi_in_bits != 0)
             midi_in_bits <= midi_in_bits + 1;
-    end
-end
-
-always_ff @(posedge clk) begin
-    if (btn1_status == 0) begin
-        btn1_status = STATUS;
-        btn1_data1 = FIRST_CC_MSG;
-        btn1_data2 = CC_VALUE;
-        btn1_bits_cnt = 30;
-
-        btn2_status = STATUS;
-        btn2_data1 = FIRST_CC_MSG + 1;
-        btn2_data2 = CC_VALUE;
-        btn2_bits_cnt = 30;
-    end
-    else if (midi_in_state == 0)
-        btn_assigned <= 0;
-    else if (midi_in_state == 1 && btn1_raise) begin
-        btn1_status <= status_in;
-        btn1_data1 <= data1_in;
-        btn1_data2 <= data2_in;
-        btn1_bits_cnt <= bytes_cnt_in * 10;
-        btn_assigned <= 1;
-    end
-    else if (midi_in_state == 1 && btn2_raise) begin
-        btn2_status <= status_in;
-        btn2_data1 <= data1_in;
-        btn2_data2 <= data2_in;
-        btn2_bits_cnt <= bytes_cnt_in * 10;
-        btn_assigned <= 1;
     end
 end
 

@@ -145,6 +145,22 @@ async def test_midi_in_3bytes(dut):
     assert dut.led2 == 1
 
 @cocotb.test()
+async def test_midi_out_on_button(dut):
+    await setup_dut(dut)
+
+    dut.btn1 <= False
+    await FallingEdge(dut.clk)
+    dut.btn1 <= True
+
+    status = await read_midi_command(dut)
+    data1 = await read_midi_command(dut)
+    data2 = await read_midi_command(dut)
+
+    assert status == dut.CC_MSG
+    assert data1 == dut.FIRST_CC_MSG
+    assert data2 == dut.CC_VALUE
+
+@cocotb.test()
 async def test_btn_assign(dut):
     """ Test MIDI and assigning to button """
 
@@ -157,42 +173,69 @@ async def test_btn_assign(dut):
     assert dut.midi_cmd_completed.value == 1
     assert dut.midi_in_state == 1
 
-    # check for default values
-    assert dut.btn1_status.value == dut.STATUS
-    assert dut.btn1_data1.value == dut.FIRST_CC_MSG.value;
-    assert dut.btn1_data2.value == dut.CC_VALUE.value;
-    assert dut.btn1_bits_cnt.value == 30;
-
     await FallingEdge(dut.clk)
     dut.btn1_raise <= True
     await FallingEdge(dut.clk)
+
+    # after this clock btn_index will be set
+    await FallingEdge(dut.clk)
+
+    assert dut.btn_index == 1
+    assert dut.midi_in_state == 2
+    assert dut.btn_assigned == 1
+    assert dut.we == 1
+
     dut.btn1_raise <= False
 
     for i in range(2):
         await FallingEdge(dut.baud_clk)
 
-    assert dut.btn1_status == status
-    assert dut.btn1_data1 == data1
-    assert dut.btn1_data2 == data2
-    assert dut.btn1_bits_cnt.value == 30
+    assert dut.smem[0] == status
+    assert dut.smem[1] == data1
+    assert dut.smem[2] == data2
+    assert dut.smem[3].value == 30
 
 @cocotb.test()
-async def test_midi_out_on_button(dut):
+async def test_midi_out_on_button_after_assign(dut):
     await setup_dut(dut)
 
-    dut.btn1 <= False
+    status = await send_command(dut, is_status = True)
+    data1 = await send_command(dut)
+    data2 = await send_command(dut, and_wait=True)
+
+    assert dut.midi_cmd_completed == 1
+    assert dut.btn_assigned == 0
+    assert dut.midi_in_state == 1
+
     await FallingEdge(dut.clk)
-    dut.btn1 <= True
+    dut.btn_index <= 2
+    dut.we <= 1
+    await FallingEdge(dut.clk)
+    assert dut.btn_index == 0
+    assert dut.btn_pressed == 0
+    assert dut.btn_assigned == 1
 
-    bindata = ''
-    for i in range(8):
-        await FallingEdge(dut.baud_clk)
-        bindata = str(dut.midi_tx.value) + bindata
+    assert dut.smem[4] == status
+    assert dut.smem[5] == data1
+    assert dut.smem[6] == data2
+    assert dut.smem[7].value == 30
 
-    status = await read_midi_command(dut)
-    data1 = await read_midi_command(dut)
-    data2 = await read_midi_command(dut)
+    await FallingEdge(dut.clk)
+    assert dut.we == 0
+    dut.btn_index <= 2
+    await FallingEdge(dut.clk)
+    assert dut.btn_pressed == 1
+    await FallingEdge(dut.clk)
 
-    assert dut.btn1_status.value == status
-    assert dut.btn1_data1.value == data1
-    assert dut.btn1_data2.value == data2
+    assert dut.cmd_set == 1
+    assert dut.status == status
+    assert dut.data1 == data1
+    assert dut.data2 == data2
+    assert dut.cmd_bits_cnt == 30
+
+    sent_status = await read_midi_command(dut)
+    assert sent_status == status
+    sent_data1 = await read_midi_command(dut)
+    assert sent_data1 == data1
+    sent_data2 = await read_midi_command(dut)
+    assert sent_data2 == data2
