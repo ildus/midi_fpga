@@ -1,6 +1,6 @@
 PRJNAME  = midi_ctrl
 TOPLEVEL = midi_ctrl
-SOURCES  = midi_ctrl.sv debounce.v
+SOURCES  = midi_ctrl.sv debounce.v spi_flash.sv
 XDC      = xc7/arty.xdc
 PCF      = ice40/ice40hx1.pcf
 BUILDDIR = build

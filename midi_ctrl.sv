@@ -45,7 +45,6 @@ localparam PC_VALUE2 = 8'h43;
 
 // protocol
 logic [7:0] bits_cnt = 0;
-logic [12:0] clk_cnt = 0;
 logic [29:0] midi_out = 0;
 
 // midi in
@@ -77,6 +76,21 @@ logic [7:0] cmd_bits_cnt = 0;
 logic cmd_set = 0;
 logic cmd_reset = 0;
 
+logic [23:0] addr;
+logic flash_we = 0;
+logic [7:0] fifo_in;
+
+// spi flash
+logic spi_cs;
+logic spi_do;
+logic spi_di;
+logic spi_clk;
+
+logic [7:0] data_out;
+logic data_ready;
+
+spi_flash flash(clk, rst, addr, flash_we, fifo_in, spi_clk, spi_cs, spi_do, spi_di, data_out, data_ready);
+
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
         cmd_set <= 0;
@@ -90,9 +104,9 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
+logic [12:0] clk_cnt = 0;
 logic baud_clk = 0;
 
-// MIDI out logic
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
         clk_cnt <= 0;
@@ -107,6 +121,7 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
+// MIDI out logic
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
         led1 <= 0;
