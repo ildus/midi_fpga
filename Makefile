@@ -1,11 +1,12 @@
 PRJNAME  = midi_ctrl
-TOPLEVEL = midi_ctrl
-SOURCES  = midi_ctrl.sv debounce.v spi_flash.sv
+SRC_DIR = src
 XDC      = xc7/arty.xdc
 PCF      = ice40/ice40hx1.pcf
 BUILDDIR = build
 BUILDDIR_ARTY = ${BUILDDIR}/arty
 BUILDDIR_ICE40 = ${BUILDDIR}/ice40
+SOURCES  = $(foreach sdir,$(SRC_DIR),$(wildcard $(sdir)/*.sv))
+export TOPLEVEL = midi_ctrl
 
 .PHONY: all
 all: xc7 ice40
@@ -55,7 +56,7 @@ ${BUILDDIR_ICE40}/${PRJNAME}.json: ${BUILDDIR}/a.out
 
 .PHONY: check
 check:
-	+make -C tests SIM=icarus
+	+make -C tests
 
 .PHONY: clean
 clean:

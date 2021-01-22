@@ -15,7 +15,13 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     input logic midi_rx,
     output logic midi_tx,
     output logic led1,
-    output logic led2
+    output logic led2,
+
+    //spi flash
+    input logic spi_do,
+    output logic spi_clk,
+    output logic spi_cs,
+    output logic spi_di
 );
 
 localparam BUTTONS_CNT = 2;
@@ -33,8 +39,6 @@ initial begin
     end
 end
 
-logic btn_pressed = 0;
-
 /* just some sample commands */
 localparam CC_MSG = 8'hB0; // CC message, channel 1
 localparam PC_MSG = 8'hC0; // PC message, channel 1
@@ -43,17 +47,24 @@ localparam CC_VALUE = 8'b0111_1111;
 localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
 
-// protocol
-logic [7:0] bits_cnt = 0;
-logic [29:0] midi_out = 0;
-
 // midi in
-logic [7:0] status_in = 0;
-logic [7:0] data1_in = 0;
-logic [7:0] data2_in = 0;
-logic [5:0] midi_reading_pos = 0;
-logic [1:0] bytes_cnt_in = 0;
-logic [7:0] midi_in = 0;
+logic [7:0] status_in;
+logic [7:0] data1_in;
+logic [7:0] data2_in;
+logic [1:0] bytes_cnt_in;
+logic midi_cmd_completed;
+
+midi_in din(baud_clk, rst, midi_rx, midi_cmd_completed, status_in, data1_in, data2_in, bytes_cnt_in);
+
+// midi out
+logic [7:0] status = 0;
+logic [7:0] data1 = 0;
+logic [7:0] data2 = 0;
+logic [7:0] cmd_bits_cnt = 0;
+logic btn_pressed = 0;
+
+midi_out dout(clk, baud_clk, rst, midi_tx, status, data1, data2, cmd_bits_cnt, btn_pressed);
+assign led1 = ~midi_tx;
 
 // raise will appear once
 logic btn1_raise;
@@ -66,30 +77,19 @@ debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
 //debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d3 (clk, rst, btn3, btn3_raise);
 //debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d4 (clk, rst, btn4, btn4_raise);
 
-// current values for MIDI OUT
-logic [7:0] status = 0;
-logic [7:0] data1 = 0;
-logic [7:0] data2 = 0;
-logic [7:0] cmd_bits_cnt = 0;
-
-// buttons
-logic cmd_set = 0;
-logic cmd_reset = 0;
 
 logic [23:0] addr;
 logic flash_we = 0;
 logic [7:0] fifo_in;
 
-// spi flash
-logic spi_cs;
-logic spi_do;
-logic spi_di;
-logic spi_clk;
-
 logic [7:0] data_out;
 logic data_ready;
 
 spi_flash flash(clk, rst, addr, flash_we, fifo_in, spi_clk, spi_cs, spi_do, spi_di, data_out, data_ready);
+
+// buttons
+logic cmd_set = 0;
+logic cmd_reset = 0;
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -122,39 +122,7 @@ always_ff @(posedge clk or negedge rst) begin
 end
 
 // MIDI out logic
-always_ff @(posedge baud_clk or negedge rst) begin
-    if (!rst) begin
-        led1 <= 0;
-        bits_cnt <= 0;
-        midi_tx <= 1;
-        midi_out <= 0;
-        cmd_reset <= 0;
-    end
-    else if (bits_cnt != 0) begin
-        midi_tx <= midi_out[0];
-        midi_out <= {1'b0, midi_out[29:1]};
-        bits_cnt <= bits_cnt - 1;
-        cmd_reset <= 0;
-    end
-    else if (cmd_set && bits_cnt == 0) begin
-        led1 <= 1;
 
-        // we're sending bits from LSB, so the structure constructed backwards
-        midi_out <= {1'b1, data2, 1'b0,
-                     1'b1, data1, 1'b0,
-                     1'b1, status, 1'b0};
-        bits_cnt <= cmd_bits_cnt;
-        cmd_reset <= 1;
-    end
-    else begin
-        led1 <= 0;
-        cmd_reset <= 0;
-        midi_tx <= 1;
-    end
-end
-
-logic [5:0] midi_in_bits = 0;
-logic midi_cmd_completed = 0;
 logic [1:0] midi_in_state;
 logic btn_assigned = 0;
 
@@ -238,65 +206,6 @@ always @(posedge clk or negedge rst) begin
     end
     else begin
         btn_pressed <= 0;
-    end
-end
-
-// MIDI in logic
-always_ff @(posedge baud_clk or negedge rst) begin
-    if (!rst) begin
-        midi_cmd_completed <= 0;
-        midi_reading_pos <= 0;
-        midi_in_bits <= 0;
-    end
-    else if (midi_reading_pos != 0) begin
-        // continue reading other bits
-
-        midi_in <= {midi_rx, midi_in[7:1]};
-        midi_in_bits <= midi_in_bits + 1;
-
-        // move current byte to destination
-        if (midi_reading_pos == 9 && midi_rx == 1) begin
-            if (midi_in[7]) begin
-                // MSB == 1 means status byte
-                status_in <= midi_in;
-                bytes_cnt_in <= 1;
-
-                // status byte cleans all running data bytes
-                data1_in <= 0;
-                data2_in <= 0;
-                midi_cmd_completed <= 0;
-            end
-            else if (bytes_cnt_in == 1) begin
-                data1_in <= midi_in;
-                bytes_cnt_in <= 2;
-            end
-            else if (bytes_cnt_in == 2) begin
-                data2_in <= midi_in;
-                bytes_cnt_in <= 3;
-            end
-        end
-
-        // that was stop bit, finish reading
-        if (midi_reading_pos == 9)
-            midi_reading_pos <= 0;
-        else
-            midi_reading_pos <= midi_reading_pos + 1;
-    end
-    else if (midi_rx == 0) begin
-        // start reading one byte
-        midi_in <= 0;
-        midi_reading_pos <= 1;
-        midi_cmd_completed <= 0;
-
-        // we give ourselves 30 baud ticks after each byte starts
-        midi_in_bits <= 0;
-    end
-    else begin
-        // this will count to 31 and stop
-        if (bytes_cnt_in != 0 && midi_in_bits == 30)
-            midi_cmd_completed <= 1;
-        else if (midi_in_bits != 0)
-            midi_in_bits <= midi_in_bits + 1;
     end
 end
 

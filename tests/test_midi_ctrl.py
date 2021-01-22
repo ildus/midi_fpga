@@ -20,10 +20,10 @@ async def send_command(dut, is_status=False, and_wait=False):
     dut.midi_rx <= 0
     await FallingEdge(dut.baud_clk)
 
-    assert dut.midi_in == 0
-    assert dut.midi_reading_pos == 1
-    assert dut.midi_cmd_completed == 0
+    assert dut.din.midi_in == 0
+    assert dut.din.midi_reading_pos == 1
     assert dut.midi_in_state == 0
+    assert dut.midi_cmd_completed == 0
 
     bindata = ''
     for i in range(8):
