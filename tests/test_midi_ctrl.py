@@ -174,7 +174,7 @@ async def test_btn_assign(dut):
     assert dut.midi_in_state == 1
 
     await FallingEdge(dut.clk)
-    dut.btn1_raise <= True
+    dut.but.btn1_raise <= True
     await FallingEdge(dut.clk)
 
     # after this clock btn_index will be set
@@ -183,9 +183,9 @@ async def test_btn_assign(dut):
     assert dut.btn_index == 1
     assert dut.midi_in_state == 2
     assert dut.btn_assigned == 1
-    assert dut.we == 1
+    assert dut.save_mode == 1
 
-    dut.btn1_raise <= False
+    dut.but.btn1_raise <= False
 
     for i in range(2):
         await FallingEdge(dut.baud_clk)
@@ -208,11 +208,15 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.midi_in_state == 1
 
     await FallingEdge(dut.clk)
-    dut.btn_index <= 2
-    dut.we <= 1
+    dut.btn2 <= 1
+    await FallingEdge(dut.but.btn2_raise)
+    await FallingEdge(dut.clk)
+    assert dut.btn_index == 2
+    assert dut.save_mode == 1
+    assert dut.but.btn2_raise == 0
     await FallingEdge(dut.clk)
     assert dut.btn_index == 0
-    assert dut.btn_pressed == 0
+    assert dut.cmd_trigger_out == 0
     assert dut.btn_assigned == 1
 
     assert dut.smem[4] == status
@@ -221,13 +225,13 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.smem[7].value == 30
 
     await FallingEdge(dut.clk)
-    assert dut.we == 0
+    assert dut.save_mode == 0
     dut.btn_index <= 2
     await FallingEdge(dut.clk)
-    assert dut.btn_pressed == 1
+    assert dut.cmd_trigger_out == 1
     await FallingEdge(dut.clk)
 
-    assert dut.cmd_set == 1
+    assert dut.cmd_trigger_out == 1
     assert dut.status == status
     assert dut.data1 == data1
     assert dut.data2 == data2

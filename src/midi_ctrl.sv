@@ -27,10 +27,8 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
 localparam BUTTONS_CNT = 2;
 localparam MEMSIZE = BUTTONS_CNT * 4;
 
-logic we = 0;
 logic [7:0] smem [MEMSIZE - 1:0];
 logic mem_initialized[BUTTONS_CNT:1];
-logic [1:0] btn_index = 0;
 
 integer i;
 initial begin
@@ -61,23 +59,20 @@ logic [7:0] status = 0;
 logic [7:0] data1 = 0;
 logic [7:0] data2 = 0;
 logic [7:0] cmd_bits_cnt = 0;
-logic btn_pressed = 0;
+logic cmd_trigger_out = 0;
 
-midi_out dout(clk, baud_clk, rst, midi_tx, status, data1, data2, cmd_bits_cnt, btn_pressed);
+midi_out dout(clk, baud_clk, rst, midi_tx, status, data1, data2, cmd_bits_cnt, cmd_trigger_out);
 assign led1 = ~midi_tx;
 
-// raise will appear once
-logic btn1_raise;
-logic btn2_raise;
-logic btn3_raise = 0;
-logic btn4_raise = 0;
+// buttons
+logic save_mode;
+logic [1:0] btn_index;
+logic [1:0] midi_in_state;
+logic btn_assigned = 0;
 
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, btn1, btn1_raise);
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
-//debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d3 (clk, rst, btn3, btn3_raise);
-//debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d4 (clk, rst, btn4, btn4_raise);
+buttons #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) but (clk, rst, btn1, btn2, midi_in_state, save_mode, btn_index);
 
-
+// spi flash
 logic [23:0] addr;
 logic flash_we = 0;
 logic [7:0] fifo_in;
@@ -86,23 +81,6 @@ logic [7:0] data_out;
 logic data_ready;
 
 spi_flash flash(clk, rst, addr, flash_we, fifo_in, spi_clk, spi_cs, spi_do, spi_di, data_out, data_ready);
-
-// buttons
-logic cmd_set = 0;
-logic cmd_reset = 0;
-
-always @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        cmd_set <= 0;
-    end
-    else begin
-        if (cmd_reset)
-            cmd_set <= 0;
-        else if (btn_pressed) begin
-            cmd_set <= 1;
-        end
-    end
-end
 
 logic [12:0] clk_cnt = 0;
 logic baud_clk = 0;
@@ -120,11 +98,6 @@ always_ff @(posedge clk or negedge rst) begin
         clk_cnt <= clk_cnt + 1;
     end
 end
-
-// MIDI out logic
-
-logic [1:0] midi_in_state;
-logic btn_assigned = 0;
 
 assign led2 = (midi_in_state == 1);
 
@@ -149,43 +122,20 @@ always @(posedge clk) begin
 end
 
 always @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        btn_index <= 0;
-        we <= 0;
-    end
-    else begin
-        case ({btn2_raise, btn1_raise})
-            4'b01: begin
-                btn_index <= 1;
-                we <= (midi_in_state == 1);
-            end
-            4'b10: begin
-                btn_index <= 2;
-                we <= (midi_in_state == 1);
-            end
-            default: begin
-                btn_index <= 0;
-                we <= 0;
-            end
-        endcase
-    end
-end
-
-always @(posedge clk or negedge rst) begin
     `define ADDR ((btn_index - 1) * 4)
 
     if (!rst) begin
-        btn_pressed <= 0;
+        cmd_trigger_out <= 0;
         for (i = 1; i <= BUTTONS_CNT; i++)
             mem_initialized[i] <= 0;
     end
     else if (btn_index != 0) begin
-        if (we) begin
+        if (save_mode) begin
             smem[`ADDR] <= status_in;
             smem[`ADDR + 1] <= data1_in;
             smem[`ADDR + 2] <= data2_in;
             smem[`ADDR + 3] <= bytes_cnt_in * 10;
-            btn_pressed <= 0;
+            cmd_trigger_out <= 0;
             mem_initialized[btn_index] <= 1;
         end
         else begin
@@ -194,18 +144,18 @@ always @(posedge clk or negedge rst) begin
                 data1 <= FIRST_CC_MSG + btn_index - 1;
                 data2 <= CC_VALUE;
                 cmd_bits_cnt <= 30;
-                btn_pressed <= 1;
+                cmd_trigger_out <= 1;
             end else begin
                 status <= smem[`ADDR];
                 data1 <= smem[`ADDR + 1];
                 data2 <= smem[`ADDR + 2];
                 cmd_bits_cnt <= smem[`ADDR + 3];
-                btn_pressed <= 1;
+                cmd_trigger_out <= 1;
             end
         end
     end
     else begin
-        btn_pressed <= 0;
+        cmd_trigger_out <= 0;
     end
 end
 
