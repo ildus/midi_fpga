@@ -1,4 +1,5 @@
 /build
 *.vcd
 a.out
+*.bin
 /env
