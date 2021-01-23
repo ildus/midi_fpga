@@ -4,10 +4,10 @@ module midi_in (
     input logic midi_rx,
 
     output logic completed,
-    output logic [7:0] status_in = 0,
-    output logic [7:0] data1_in = 0,
-    output logic [7:0] data2_in = 0,
-    output logic [1:0] bytes_cnt_in = 0
+    output logic [7:0] status_in,
+    output logic [7:0] data1_in,
+    output logic [7:0] data2_in,
+    output logic [1:0] bytes_cnt_in
 );
 
 logic [5:0] midi_reading_pos = 0;

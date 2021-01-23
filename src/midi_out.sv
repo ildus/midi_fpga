@@ -3,7 +3,7 @@ module midi_out (
     input logic baud_clk,   /* midi clk, 31250 bits/sec */
     input logic rst,
 
-    output logic midi_tx = 1,
+    output logic midi_tx,
 
     input logic [7:0] status,
     input logic [7:0] data1,

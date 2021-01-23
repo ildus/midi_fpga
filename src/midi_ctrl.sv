@@ -45,6 +45,8 @@ localparam CC_VALUE = 8'b0111_1111;
 localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
 
+logic baud_clk = 0;
+
 // midi in
 logic [7:0] status_in;
 logic [7:0] data1_in;
@@ -83,7 +85,6 @@ logic data_ready;
 spi_flash flash(clk, rst, addr, flash_we, fifo_in, spi_clk, spi_cs, spi_do, spi_di, data_out, data_ready);
 
 logic [12:0] clk_cnt = 0;
-logic baud_clk = 0;
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -99,7 +100,8 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-assign led2 = (midi_in_state == 1);
+//assign led2 = (midi_in_state == 1);
+assign led2 = data_ready;
 
 always @(*) begin
     if (!rst)

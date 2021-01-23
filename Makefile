@@ -5,7 +5,8 @@ PCF      = ice40/ice40hx1.pcf
 BUILDDIR = build
 BUILDDIR_ARTY = ${BUILDDIR}/arty
 BUILDDIR_ICE40 = ${BUILDDIR}/ice40
-SOURCES  = $(foreach sdir,$(SRC_DIR),$(wildcard $(sdir)/*.sv))
+SOURCES  = $(wildcard ${SRC_DIR}/*.sv)
+FILES = $(subst src/,,${SOURCES})
 export TOPLEVEL = midi_ctrl
 
 .PHONY: all
@@ -33,20 +34,27 @@ sim: ${BUILDDIR}/a.out
 
 ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 	cp ${SOURCES} ${BUILDDIR}/
-	cd ${BUILDDIR} && xvlog -sv ${SOURCES}
-	cd ${BUILDDIR} && iverilog -g2012 -I. ${SOURCES}
+	cd ${BUILDDIR} && xvlog -sv ${FILES}
+	cd ${BUILDDIR} && iverilog -g2012 -I. ${FILES}
 
 upload_xc7: ${BUILDDIR_ARTY}/top.bit
 	openocd -f xc7/digilent_arty.cfg -c "init; pld load 0 ${BUILDDIR_ARTY}/top.bit; exit"
 
+PADDED=${BUILDDIR_ICE40}/padded.bin
+
 upload_ice40: ${BUILDDIR_ICE40}/${PRJNAME}.bin
-	rm -f ${BUILDDIR_ICE40}/padded_binary
-	truncate -s 2M ${BUILDDIR_ICE40}/padded_binary
-	dd if=${BUILDDIR_ICE40}/${PRJNAME}.bin conv=notrunc of=padded_binary
-	scp padded_binary banana:~/${PRJNAME}.bin
+	rm -f ${PADDED}
+	truncate -s 2M ${PADDED}
+	dd if=${BUILDDIR_ICE40}/${PRJNAME}.bin conv=notrunc of=${PADDED}
+	scp ${PADDED} banana:~/${PRJNAME}.bin
+	ssh banana 'echo 25 > /sys/class/gpio/export && echo out > /sys/class/gpio/gpio25/direction'
+	ssh banana 'gpio load spi'
+	ssh banana 'flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=20000 -w ~/${PRJNAME}.bin'
+	ssh banana 'echo in > /sys/class/gpio/gpio25/direction'
+	ssh banana 'echo 25 > /sys/class/gpio/unexport'
 
 ${BUILDDIR_ICE40}/${PRJNAME}.bin: ${BUILDDIR_ICE40}/${PRJNAME}.asc
-	icepack ${BUILDDIR_ICE40}/${PRJNAME}.asc ${BUILDDIR_ICE40}/packed.bin
+	icepack ${BUILDDIR_ICE40}/${PRJNAME}.asc ${BUILDDIR_ICE40}/${PRJNAME}.bin
 
 ${BUILDDIR_ICE40}/${PRJNAME}.asc: ${BUILDDIR_ICE40}/${PRJNAME}.json ${PCF}
 	nextpnr-ice40 --hx1k --package vq100 --json ${BUILDDIR_ICE40}/${PRJNAME}.json --pcf ${PCF}  --asc $@

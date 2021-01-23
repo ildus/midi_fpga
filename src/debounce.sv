@@ -6,7 +6,7 @@
 module debounce_internal #(parameter CNT = 21)
 	(
 	input       clk, rst, button_in,    // inputs
-	output reg 	button_out = 0				// output
+	output reg 	button_out				// output
 	);
 	parameter N = CNT ;      // counter should fill in 10ms in 100Mhz
 
