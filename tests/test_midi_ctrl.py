@@ -243,3 +243,10 @@ async def test_midi_out_on_button_after_assign(dut):
     assert sent_data1 == data1
     sent_data2 = await read_midi_command(dut)
     assert sent_data2 == data2
+
+@cocotb.test()
+async def test_spi_flash(dut):
+    await setup_dut(dut)
+
+    for i in range(1000):
+        await FallingEdge(dut.clk)
