@@ -21,7 +21,13 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     input logic spi_do,
     output logic spi_clk,
     output logic spi_cs,
-    output logic spi_di
+    output logic spi_di,
+
+    // debug
+    output logic debug1,
+    output logic debug2,
+    output logic debug3,
+    output logic debug4
 );
 
 localparam BUTTONS_CNT = 4;
@@ -29,13 +35,6 @@ localparam MEMSIZE = BUTTONS_CNT * 4;
 
 logic [7:0] memmap [MEMSIZE - 1:0];
 logic mem_init[BUTTONS_CNT:1];
-
-integer i;
-initial begin
-    for(i = 1; i <= BUTTONS_CNT; i++) begin
-        mem_init[i] <= 0;
-    end
-end
 
 /* just some sample commands */
 localparam CC_MSG = 8'hB0; // CC message, channel 1
@@ -89,13 +88,18 @@ logic spi_rty_i;
 logic spi_init = 0;
 logic spi_rst_o = 0;
 
+assign debug1 = btn_index == 1;
+assign debug2 = btn_index == 2;
+assign debug3 = spi_rst_o;
+assign debug4 = spi_init;
+
 spi_flash flash(
-    clk, spi_rst_o,                                         // syscon
+    baud_clk, spi_rst_o,                                    // syscon
     spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
     spi_clk, spi_cs, spi_do, spi_di);                       // pins
 
-always @(posedge clk or negedge rst) begin
+always @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
         spi_init <= 0;
         spi_rst_o <= 1;
@@ -111,17 +115,22 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
-always @(posedge clk) begin
-    if (spi_rst_o) begin
+logic [2:0] memindex = 0;
+
+integer i;
+always @(posedge baud_clk) begin
+    `define ADDR(b) ((b - 1) * 4)
+    if (memindex == 0) begin
+        memindex <= 1;
+
+        for (i = 1; i <= BUTTONS_CNT; i++) begin
+            mem_init[i] <= 0;
+        end
+    end
+    else if (spi_rst_o) begin
         spi_stb_o <= 0;
     end
-end
-
-logic [2:0] memindex = 1;
-
-always @(posedge clk) begin
-    `define ADDR(b) ((b - 1) * 4)
-    if (spi_stb_o) begin
+    else if (spi_stb_o) begin
         if (spi_rty_i == 1) begin
             /* just cancel and read another time */
             spi_stb_o <= 0;
@@ -198,8 +207,6 @@ always @(posedge clk or negedge rst) begin
 
     if (!rst) begin
         cmd_trigger_out <= 0;
-        for (i = 1; i <= BUTTONS_CNT; i++)
-            mem_init[i] <= 0;
     end
     else if (btn_index != 0 && !save_mode) begin
         if (!mem_init[btn_index]) begin

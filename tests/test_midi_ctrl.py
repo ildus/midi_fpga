@@ -5,7 +5,7 @@ from cocotb.triggers import FallingEdge, RisingEdge
 from cocotb.binary import BinaryValue
 
 async def setup_dut(dut):
-    clock = Clock(dut.clk, 1, units="us")
+    clock = Clock(dut.clk, 10, units="ns")
     cocotb.fork(clock.start())
 
     # reset the system
@@ -248,5 +248,5 @@ async def test_midi_out_on_button_after_assign(dut):
 async def test_spi_flash(dut):
     await setup_dut(dut)
 
-    for i in range(1000):
+    for i in range(10000):
         await FallingEdge(dut.clk)

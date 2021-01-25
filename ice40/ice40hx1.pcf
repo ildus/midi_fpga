@@ -7,10 +7,15 @@ set_io led2		51
 set_io midi_rx	1
 set_io midi_tx	2
 
+set_io debug1  18
+set_io debug2  19
+set_io debug3  20
+set_io debug4  21
+
 #spi
 set_io spi_do   46
 set_io spi_di   45
 set_io spi_clk  48
 set_io spi_cs   49
 
-#set_io -pullup yes [port] [pin]
+#set_io -pullup yes debug4  21

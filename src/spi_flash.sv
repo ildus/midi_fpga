@@ -13,7 +13,11 @@ module spi_flash
     output logic rty_o,
 
     /* spi pins */
+`ifdef COCOTB_SIM
     output logic spi_do,
+`else
+    input logic spi_do,
+`endif
     output logic spi_clk,
     output logic spi_cs,
     output logic spi_di
@@ -47,7 +51,7 @@ always @(posedge clk_i) begin
         spi_clk_int <= 0;
         spi_clk <= 0;
     end
-    else if (!spi_clk_cnt) begin
+    else if (spi_clk_cnt) begin
         spi_clk_int <= 1;
         spi_clk <= spi_clk_en;
         spi_clk_cnt <= ~spi_clk_cnt;
