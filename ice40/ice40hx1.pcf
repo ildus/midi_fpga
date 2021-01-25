@@ -1,7 +1,6 @@
 set_io clk		15
-set_io btn1		41
-set_io btn2		3
-set_io rst		42 # btn2
+set_io board_btn		41  #BUT1
+set_io rst		        42  #BUT2
 set_io led1		40
 set_io led2		51
 set_io midi_rx	1
@@ -18,4 +17,5 @@ set_io spi_di   45
 set_io spi_clk  48
 set_io spi_cs   49
 
-#set_io -pullup yes debug4  21
+set_io -pullup yes btn2_pin_1  4
+set_io -pullup yes btn2_pin_2  7

@@ -190,10 +190,10 @@ async def test_btn_assign(dut):
     for i in range(2):
         await FallingEdge(dut.baud_clk)
 
-    assert dut.smem[0] == status
-    assert dut.smem[1] == data1
-    assert dut.smem[2] == data2
-    assert dut.smem[3].value == 30
+    assert dut.memmap[0] == status
+    assert dut.memmap[1] == data1
+    assert dut.memmap[2] == data2
+    assert dut.memmap[3].value == 30
 
 @cocotb.test()
 async def test_midi_out_on_button_after_assign(dut):
@@ -219,10 +219,10 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.cmd_trigger_out == 0
     assert dut.btn_assigned == 1
 
-    assert dut.smem[4] == status
-    assert dut.smem[5] == data1
-    assert dut.smem[6] == data2
-    assert dut.smem[7].value == 30
+    assert dut.memmap[4] == status
+    assert dut.memmap[5] == data1
+    assert dut.memmap[6] == data2
+    assert dut.memmap[7].value == 30
 
     await FallingEdge(dut.clk)
     assert dut.save_mode == 0

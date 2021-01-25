@@ -10,8 +10,7 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
 (
     input logic rst,
     input logic clk,
-    input logic btn1,
-    input logic btn2,
+    input logic board_btn,
     input logic midi_rx,
     output logic midi_tx,
     output logic led1,
@@ -27,14 +26,18 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     output logic debug1,
     output logic debug2,
     output logic debug3,
-    output logic debug4
+    output logic debug4,
+
+    // external buttons
+    input logic btn2_pin_1,
+    input logic btn2_pin_2
 );
 
 localparam BUTTONS_CNT = 4;
 localparam MEMSIZE = BUTTONS_CNT * 4;
 
-logic [7:0] memmap [MEMSIZE - 1:0];
-logic mem_init[BUTTONS_CNT:1];
+logic [7:0] memmap [1:MEMSIZE - 1];
+logic [BUTTONS_CNT:1] mem_init;
 
 /* just some sample commands */
 localparam CC_MSG = 8'hB0; // CC message, channel 1
@@ -72,7 +75,10 @@ logic [1:0] btn_index;
 logic [1:0] midi_in_state;
 logic btn_assigned = 0;
 
-buttons #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) but (clk, rst, btn1, btn2, midi_in_state, save_mode, btn_index);
+buttons #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) but (
+    clk, rst,
+    board_btn, btn2_pin_1, btn2_pin_2,
+    midi_in_state, save_mode, btn_index);
 
 // spi flash
 logic [23:0] spi_adr_o = 0;
@@ -88,18 +94,18 @@ logic spi_rty_i;
 logic spi_init = 0;
 logic spi_rst_o = 0;
 
-assign debug1 = btn_index == 1;
+assign debug1 = btn_index == 3;
 assign debug2 = btn_index == 2;
-assign debug3 = spi_rst_o;
+assign debug3 = btn_index == 1;
 assign debug4 = spi_init;
 
 spi_flash flash(
-    baud_clk, spi_rst_o,                                    // syscon
+    clk, spi_rst_o,                                    // syscon
     spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
     spi_clk, spi_cs, spi_do, spi_di);                       // pins
 
-always @(posedge baud_clk or negedge rst) begin
+always @(posedge clk or negedge rst) begin
     if (!rst) begin
         spi_init <= 0;
         spi_rst_o <= 1;
@@ -118,7 +124,7 @@ end
 logic [2:0] memindex = 0;
 
 integer i;
-always @(posedge baud_clk) begin
+always @(posedge clk) begin
     `define ADDR(b) ((b - 1) * 4)
     if (memindex == 0) begin
         memindex <= 1;
@@ -137,7 +143,7 @@ always @(posedge baud_clk) begin
         end
         else if (spi_ack_i == 1) begin
             spi_stb_o <= 0;
-            mem_init[memindex] <= 1;
+            //mem_init[memindex] <= 1;
             memindex <= memindex + 1;
 
             // read from LSB to MSB
@@ -153,7 +159,7 @@ always @(posedge baud_clk) begin
         memmap[`ADDR(btn_index) + 1] <= data1_in;
         memmap[`ADDR(btn_index) + 2] <= data2_in;
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
-        mem_init[btn_index] <= 1;
+        //mem_init[btn_index] <= 1;
     end
     else if (spi_init && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
         spi_stb_o <= 1;
@@ -179,10 +185,10 @@ always_ff @(posedge clk or negedge rst) begin
     end
 end
 
-//assign led2 = (midi_in_state == 1);
-assign led2 = spi_ack_i;
+assign led2 = (midi_in_state == 1);
+//assign led2 = spi_ack_i;
 
-always @(*) begin
+always_comb begin
     if (!rst)
         midi_in_state = 0;
     else if (midi_cmd_completed && !btn_assigned)

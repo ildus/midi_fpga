@@ -1,8 +1,9 @@
 module buttons #(parameter DEBOUNCE_CNT=21) (
     input logic clk,
     input logic rst,
-    input logic btn1,
-    input logic btn2,
+    input logic board_btn,
+    input logic btn2_pin_1,
+    input logic btn2_pin_2,
     input logic [1:0] midi_in_state,
 
     output logic save_mode,
@@ -13,8 +14,8 @@ module buttons #(parameter DEBOUNCE_CNT=21) (
 logic btn1_raise;
 logic btn2_raise;
 
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, btn1, btn1_raise);
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d2 (clk, rst, btn2, btn2_raise);
+debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, board_btn, btn1_raise);
+debounce_3pin spdt1(clk, btn2_pin_1, btn2_pin_2, btn2_raise);
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -22,12 +23,12 @@ always @(posedge clk or negedge rst) begin
         save_mode <= 0;
     end
     else begin
-        casex ({btn2_raise, btn1_raise})
-            4'bx1: begin
+        case ({btn2_raise, btn1_raise})
+            2'b01: begin
                 btn_index <= 1;
                 save_mode <= (midi_in_state == 1);
             end
-            4'b1x: begin
+            2'b10: begin
                 btn_index <= 2;
                 save_mode <= (midi_in_state == 1);
             end

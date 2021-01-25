@@ -5,8 +5,8 @@
 `timescale 1 ns / 100 ps
 module debounce_internal #(parameter CNT = 21)
 	(
-	input       clk, rst, button_in,    // inputs
-	output reg 	button_out				// output
+	input       clk, button_in,    // inputs
+	output reg 	button_out = 0			// output
 	);
 	parameter N = CNT ;      // counter should fill in 10ms in 100Mhz
 
@@ -35,20 +35,11 @@ module debounce_internal #(parameter CNT = 21)
 
     // Flip flop inputs and q_reg update
 	always @ ( posedge clk )
-		begin
-			if (!rst)
-				begin
-					DFF1 <= 1'b0;
-					DFF2 <= 1'b0;
-					q_reg <= { N {1'b0} };
-				end
-			else
-				begin
-					DFF1 <= button_in;
-					DFF2 <= DFF1;
-					q_reg <= q_next;
-				end
-		end
+        begin
+            DFF1 <= button_in;
+            DFF2 <= DFF1;
+            q_reg <= q_next;
+        end
 
     // counter control
 	always @ ( posedge clk )
@@ -61,31 +52,38 @@ module debounce_internal #(parameter CNT = 21)
 
 endmodule
 
+`ifdef COCOTB_SIM
+localparam defval = 0;
+`else
+localparam defval = 1;  // pulled up
+`endif
+
 // `raised` will be set only on one clock period
 module debounce #(parameter DEBOUNCE_CNT=21) (
     input logic clk,
     input logic rst,
     input logic btn,
-    output logic raised
+    output logic raised = 0
 );
     logic oldval = 0;
-    logic pressed;
+    logic btn_val;
 
-    debounce_internal #(.CNT(DEBOUNCE_CNT)) deby (clk, rst, btn, pressed);
+    debounce_internal #(.CNT(DEBOUNCE_CNT)) deby (clk, btn, btn_val);
 
     always @(posedge clk or negedge rst) begin
         if (!rst) begin
             raised <= 0;
-            oldval <= 0;
         end
         else begin
-            if (oldval != pressed && pressed) begin
-                raised <= 1;
+            if (btn_val != defval) begin
+                if (oldval != btn_val) begin
+                    raised <= 1;
+                end
+                else
+                    raised <= 0;
             end
-            else
-                raised <= 0;
 
-            oldval <= pressed;
+            oldval <= btn_val;
         end
     end
 endmodule

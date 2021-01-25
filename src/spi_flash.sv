@@ -40,7 +40,7 @@ logic spi_clk_en = 0;
 logic spi_clk_cnt = 0; // just one bit, for 50Mhz
 
 // termination signals
-logic ack, rty;
+logic ack = 0, rty = 0;
 
 assign ack_o = stb_i && ack;
 assign rty_o = stb_i && rty;
@@ -63,7 +63,7 @@ always @(posedge clk_i) begin
     end
 end
 
-always @(*) begin
+always_comb begin
     if (rst_i) begin
         state = IDLE;
     end
@@ -93,8 +93,12 @@ always @(posedge clk_i) begin
 end
 `endif
 
-always @(posedge spi_clk_int) begin
-    if (state == READ) begin
+always @(posedge spi_clk_int or posedge rst_i) begin
+    if (rst_i) begin
+        ack <= 0;
+        rty <= 0;
+    end
+    else if (state == READ) begin
         if (inner_state == 0) begin
             {spi_di, cmd} <= {CMD_STATUS, 1'b0};
             bits_cnt <= 7;
