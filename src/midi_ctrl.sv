@@ -8,7 +8,7 @@
 */
 module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 21)
 (
-    input logic rst,
+    input logic rst_i,
     input logic clk,
     input logic board_btn,
     input logic midi_rx,
@@ -50,6 +50,10 @@ localparam MEMADDR = 24'h1ffd80;
 
 logic baud_clk = 0;
 
+// debounce reset button (BUT2)
+logic rst;
+debounce #(.CNT(DEBOUNCE_CNT)) deby (clk, rst_i, rst);
+
 // midi in
 logic [7:0] status_in;
 logic [7:0] data1_in;
@@ -81,6 +85,7 @@ buttons #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) but (
     midi_in_state, save_mode, btn_index);
 
 // spi flash
+logic spi_clk_o;
 logic [23:0] spi_adr_o = 0;
 logic [31:0] spi_dat_o = 0;
 logic spi_we_o = 0;
@@ -94,13 +99,12 @@ logic spi_rty_i;
 logic spi_init = 0;
 logic spi_rst_o = 0;
 
-assign debug1 = btn_index == 3;
 assign debug2 = btn_index == 2;
 assign debug3 = btn_index == 1;
 assign debug4 = spi_init;
 
 spi_flash flash(
-    clk, spi_rst_o,                                    // syscon
+    spi_clk_o, spi_rst_o,                                    // syscon
     spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
     spi_clk, spi_cs, spi_do, spi_di);                       // pins
@@ -119,6 +123,19 @@ always @(posedge clk or negedge rst) begin
             spi_rst_o <= 0;
         end
     end
+end
+
+always @(posedge clk) begin
+    if (!rst) begin
+        spi_clk_o <= 1;
+    end
+    else begin
+        spi_clk_o <= ~spi_clk_o;
+    end
+end
+
+always_comb begin
+    debug1 = spi_clk_o;
 end
 
 logic [2:0] memindex = 0;

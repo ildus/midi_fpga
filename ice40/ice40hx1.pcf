@@ -1,6 +1,6 @@
 set_io clk		15
 set_io board_btn		41  #BUT1
-set_io rst		        42  #BUT2
+set_io rst_i		    42  #BUT2
 set_io led1		40
 set_io led2		51
 set_io midi_rx	1

@@ -14,7 +14,7 @@ module buttons #(parameter DEBOUNCE_CNT=21) (
 logic btn1_raise;
 logic btn2_raise;
 
-debounce #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, board_btn, btn1_raise);
+debounce_short #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) d1 (clk, rst, board_btn, btn1_raise);
 debounce_3pin spdt1(clk, btn2_pin_1, btn2_pin_2, btn2_raise);
 
 always @(posedge clk or negedge rst) begin

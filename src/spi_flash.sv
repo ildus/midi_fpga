@@ -35,7 +35,6 @@ logic [3:0] state = IDLE;
 logic [7:0] cmd = 0;
 logic [5:0] bits_cnt = 0;
 
-logic spi_clk_int = 0;
 logic spi_clk_en = 0;
 logic spi_clk_cnt = 0; // just one bit, for 50Mhz
 
@@ -45,23 +44,8 @@ logic ack = 0, rty = 0;
 assign ack_o = stb_i && ack;
 assign rty_o = stb_i && rty;
 
-always @(posedge clk_i) begin
-    if (rst_i) begin
-        spi_clk_cnt <= 0;
-        spi_clk_int <= 0;
-        spi_clk <= 0;
-    end
-    else if (spi_clk_cnt) begin
-        spi_clk_int <= 1;
-        spi_clk <= spi_clk_en;
-        spi_clk_cnt <= ~spi_clk_cnt;
-    end
-    else begin
-        spi_clk <= 0;
-        spi_clk_int <= 0;
-        spi_clk_cnt <= ~spi_clk_cnt;
-    end
-end
+// this is clock going to chip
+assign spi_clk = clk_i && spi_clk_en;
 
 always_comb begin
     if (rst_i) begin
@@ -93,7 +77,7 @@ always @(posedge clk_i) begin
 end
 `endif
 
-always @(posedge spi_clk_int or posedge rst_i) begin
+always @(posedge clk_i or posedge rst_i) begin
     if (rst_i) begin
         ack <= 0;
         rty <= 0;

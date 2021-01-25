@@ -3,7 +3,7 @@
 // Small Footprint Button Debouncer
 
 `timescale 1 ns / 100 ps
-module debounce_internal #(parameter CNT = 21)
+module debounce #(parameter CNT = 21)
 	(
 	input       clk, button_in,    // inputs
 	output reg 	button_out = 0			// output
@@ -59,7 +59,7 @@ localparam defval = 1;  // pulled up
 `endif
 
 // `raised` will be set only on one clock period
-module debounce #(parameter DEBOUNCE_CNT=21) (
+module debounce_short #(parameter DEBOUNCE_CNT=21) (
     input logic clk,
     input logic rst,
     input logic btn,
@@ -68,7 +68,7 @@ module debounce #(parameter DEBOUNCE_CNT=21) (
     logic oldval = 0;
     logic btn_val;
 
-    debounce_internal #(.CNT(DEBOUNCE_CNT)) deby (clk, btn, btn_val);
+    debounce #(.CNT(DEBOUNCE_CNT)) deby (clk, btn, btn_val);
 
     always @(posedge clk or negedge rst) begin
         if (!rst) begin
