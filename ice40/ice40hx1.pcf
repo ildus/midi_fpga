@@ -6,10 +6,14 @@ set_io led2		51
 set_io midi_rx	1
 set_io midi_tx	2
 
-set_io debug1  18
-set_io debug2  19
-set_io debug3  20
-set_io debug4  21
+set_io debug[0]  18
+set_io debug[1]  19
+set_io debug[2]  20
+set_io debug[3]  21
+set_io debug[4]  27
+set_io debug[5]  26
+set_io debug[6]  25
+set_io debug[7]  24
 
 #spi
 set_io spi_do   46

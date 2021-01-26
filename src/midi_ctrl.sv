@@ -23,10 +23,7 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     output logic spi_di,
 
     // debug
-    output logic debug1,
-    output logic debug2,
-    output logic debug3,
-    output logic debug4,
+    output logic [7:0] debug,
 
     // external buttons
     input logic btn2_pin_1,
@@ -99,15 +96,11 @@ logic spi_rty_i;
 logic spi_init = 0;
 logic spi_rst_o = 0;
 
-assign debug2 = btn_index == 2;
-assign debug3 = btn_index == 1;
-assign debug4 = spi_init;
-
 spi_flash flash(
     spi_clk_o, spi_rst_o,                                    // syscon
     spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
-    spi_clk, spi_cs, spi_do, spi_di);                       // pins
+    spi_do, spi_clk, spi_cs, spi_di);                       // pins
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -135,7 +128,14 @@ always @(posedge clk) begin
 end
 
 always_comb begin
-    debug1 = spi_clk_o;
+    debug[0] = spi_rst_o;
+    debug[1] = spi_stb_o;
+    debug[2] = spi_cs;
+    debug[3] = spi_clk;
+    debug[4] = spi_ack_i;
+    debug[5] = spi_rty_i;
+    debug[6] = spi_di;
+    debug[7] = spi_do;
 end
 
 logic [2:0] memindex = 0;
@@ -143,7 +143,7 @@ logic [2:0] memindex = 0;
 integer i;
 always @(posedge clk) begin
     `define ADDR(b) ((b - 1) * 4)
-    if (memindex == 0) begin
+    if (spi_rst_o) begin
         memindex <= 1;
 
         for (i = 1; i <= BUTTONS_CNT; i++) begin
@@ -178,7 +178,7 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
         //mem_init[btn_index] <= 1;
     end
-    else if (spi_init && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
+    else if (!spi_rst_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
         spi_stb_o <= 1;
         spi_adr_o <= MEMADDR;
         spi_we_o <= 0;  /* reading */

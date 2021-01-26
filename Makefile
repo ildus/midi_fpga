@@ -34,7 +34,7 @@ sim: ${BUILDDIR}/a.out
 
 ${BUILDDIR}/a.out: $(SOURCES) | ${BUILDDIR}
 	cp ${SOURCES} ${BUILDDIR}/
-	cd ${BUILDDIR} && xvlog -sv ${FILES}
+	#cd ${BUILDDIR} && xvlog -sv ${FILES}
 	cd ${BUILDDIR} && iverilog -g2012 -I. ${FILES}
 
 upload_xc7: ${BUILDDIR_ARTY}/top.bit

@@ -36,7 +36,6 @@ logic [7:0] cmd = 0;
 logic [5:0] bits_cnt = 0;
 
 logic spi_clk_en = 0;
-logic spi_clk_cnt = 0; // just one bit, for 50Mhz
 
 // termination signals
 logic ack = 0, rty = 0;
@@ -81,6 +80,7 @@ always @(posedge clk_i or posedge rst_i) begin
     if (rst_i) begin
         ack <= 0;
         rty <= 0;
+        inner_state <= 0;
     end
     else if (state == READ) begin
         if (inner_state == 0) begin
