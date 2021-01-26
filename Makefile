@@ -42,16 +42,19 @@ upload_xc7: ${BUILDDIR_ARTY}/top.bit
 
 PADDED=${BUILDDIR_ICE40}/padded.bin
 
-upload_ice40: ${BUILDDIR_ICE40}/${PRJNAME}.bin
-	rm -f ${PADDED}
-	truncate -s 2M ${PADDED}
-	dd if=${BUILDDIR_ICE40}/${PRJNAME}.bin conv=notrunc of=${PADDED}
+upload_ice40: ${PADDED}
 	scp ${PADDED} banana:~/${PRJNAME}.bin
 	ssh banana 'echo 25 > /sys/class/gpio/export && echo out > /sys/class/gpio/gpio25/direction'
 	ssh banana 'gpio load spi'
 	ssh banana 'flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=20000 -w ~/${PRJNAME}.bin'
 	ssh banana 'echo in > /sys/class/gpio/gpio25/direction'
 	ssh banana 'echo 25 > /sys/class/gpio/unexport'
+
+${PADDED}: ${BUILDDIR_ICE40}/${PRJNAME}.bin
+	rm -f ${PADDED}
+	truncate -s 2M ${PADDED}
+	dd if=${BUILDDIR_ICE40}/${PRJNAME}.bin conv=notrunc of=${PADDED}
+	python3 write_default.py ${PADDED}
 
 ${BUILDDIR_ICE40}/${PRJNAME}.bin: ${BUILDDIR_ICE40}/${PRJNAME}.asc
 	icepack ${BUILDDIR_ICE40}/${PRJNAME}.asc ${BUILDDIR_ICE40}/${PRJNAME}.bin
