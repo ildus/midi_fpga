@@ -43,7 +43,8 @@ localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
 localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
-localparam MEMADDR = 24'h1ffd80;
+//localparam MEMADDR = 24'h1ffd80;
+localparam MEMADDR = 24'h000000;
 
 logic baud_clk = 0;
 
@@ -138,6 +139,7 @@ always_comb begin
     debug[7] = spi_do;
 end
 
+logic [1:0] rty_count = 0;
 logic [2:0] memindex = 0;
 
 integer i;
@@ -145,6 +147,7 @@ always @(posedge clk) begin
     `define ADDR(b) ((b - 1) * 4)
     if (spi_rst_o) begin
         memindex <= 1;
+        rty_count <= 0;
 
         for (i = 1; i <= BUTTONS_CNT; i++) begin
             mem_init[i] <= 0;
@@ -157,6 +160,7 @@ always @(posedge clk) begin
         if (spi_rty_i == 1) begin
             /* just cancel and read another time */
             spi_stb_o <= 0;
+            rty_count <= rty_count + 1;
         end
         else if (spi_ack_i == 1) begin
             spi_stb_o <= 0;
@@ -178,7 +182,7 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
         //mem_init[btn_index] <= 1;
     end
-    else if (!spi_rst_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
+    else if (!spi_rst_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && rty_count != 2'b11) begin
         spi_stb_o <= 1;
         spi_adr_o <= MEMADDR;
         spi_we_o <= 0;  /* reading */
