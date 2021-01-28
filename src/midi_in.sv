@@ -7,12 +7,17 @@ module midi_in (
     output logic [7:0] status_in,
     output logic [7:0] data1_in,
     output logic [7:0] data2_in,
-    output logic [1:0] bytes_cnt_in
+    output logic [1:0] bytes_cnt_in,
+
+    output logic debug
 );
 
 logic [5:0] midi_reading_pos = 0;
 logic [5:0] midi_in_bits = 0;
 logic [7:0] midi_in = 0;
+
+always_ff @(posedge baud_clk)
+    debug <= midi_rx;
 
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin

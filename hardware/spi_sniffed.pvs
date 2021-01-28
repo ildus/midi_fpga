@@ -1,5 +1,5 @@
 [General]
-decode_signals=2
+decode_signals=3
 meta_objs=0
 views=1
 
@@ -78,28 +78,28 @@ color=4293776384
 conv_options=0
 conversion_type=0
 enabled=true
-name=spi_ack_i
+name=spi_do
 
 [5]
 color=4285780502
 conv_options=0
 conversion_type=0
 enabled=true
-name=spi_rty_i
+name=spi_di
 
 [6]
 color=4281623972
 conv_options=0
 conversion_type=0
 enabled=true
-name=spi_di
+name=midi_tx
 
 [7]
 color=4285878395
 conv_options=0
 conversion_type=0
 enabled=true
-name=spi_do
+name=midi_rx
 
 [8]
 color=4287138437
@@ -119,10 +119,10 @@ name=9
 channel0\assigned_signal_name=spi_clk
 channel0\initial_pin_state=2
 channel0\name=CLK
-channel1\assigned_signal_name=spi_do
+channel1\assigned_signal_name=midi_rx
 channel1\initial_pin_state=2
 channel1\name=MISO
-channel2\assigned_signal_name=spi_di
+channel2\assigned_signal_name=midi_tx
 channel2\initial_pin_state=2
 channel2\name=MOSI
 channel3\assigned_signal_name=spi_cs
@@ -211,6 +211,63 @@ decoders=1
 enabled=true
 name=Guess bitrate
 
+[decode_signal2]
+channel0\assigned_signal_name=midi_rx
+channel0\initial_pin_state=2
+channel0\name=RX
+channel1\assigned_signal_name=midi_tx
+channel1\initial_pin_state=2
+channel1\name=TX
+channels=2
+color=4286753330
+conv_options=0
+conversion_type=0
+decoder0\ann_class0\visible=true
+decoder0\ann_class1\visible=true
+decoder0\ann_class10\visible=true
+decoder0\ann_class11\visible=true
+decoder0\ann_class12\visible=true
+decoder0\ann_class13\visible=true
+decoder0\ann_class14\visible=true
+decoder0\ann_class15\visible=true
+decoder0\ann_class16\visible=true
+decoder0\ann_class17\visible=true
+decoder0\ann_class2\visible=true
+decoder0\ann_class3\visible=true
+decoder0\ann_class4\visible=true
+decoder0\ann_class5\visible=true
+decoder0\ann_class6\visible=true
+decoder0\ann_class7\visible=true
+decoder0\ann_class8\visible=true
+decoder0\ann_class9\visible=true
+decoder0\id=uart
+decoder0\option0\name=baudrate
+decoder0\option0\type=x
+decoder0\option0\value=@ByteArray(\x12z\0\0\0\0\0\0)
+decoder0\options=1
+decoder0\row0\visible=true
+decoder0\row1\visible=true
+decoder0\row2\visible=true
+decoder0\row3\visible=true
+decoder0\row4\visible=true
+decoder0\row5\visible=true
+decoder0\row6\visible=true
+decoder0\row7\visible=true
+decoder0\row8\visible=true
+decoder0\row9\visible=true
+decoder0\visible=true
+decoder1\ann_class0\visible=true
+decoder1\ann_class1\visible=true
+decoder1\ann_class2\visible=true
+decoder1\id=midi
+decoder1\options=0
+decoder1\row0\visible=true
+decoder1\row1\visible=true
+decoder1\visible=true
+decoders=2
+enabled=true
+name=MIDI
+
 [view0]
 0\trace_height=30
 1\trace_height=30
@@ -231,6 +288,6 @@ name=Guess bitrate
 offset=22 serialization::archive 18 0 0 0 0 966771 53022785 53099162 81064177 7049623 59600876 -8 0 0 6
 scale=1.946299653853243e-08
 segment_display_mode=3
-splitter_state=@ByteArray(\0\0\0\xff\0\0\0\x1\0\0\0\x2\0\0\0\x89\0\0\x6\xee\x1\0\0\0\x1\x1\0\0\0\x1\0)
+splitter_state=@ByteArray(\0\0\0\xff\0\0\0\x1\0\0\0\x2\0\0\0\x89\0\0\x5\x94\x1\0\0\0\x1\x1\0\0\0\x1\0)
 v_offset=-258
 zero_offset=22 serialization::archive 18 0 0 0 0 0 0 0 0 0 0 0 0 0 6
