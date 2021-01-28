@@ -27,22 +27,31 @@ module spi_flash
 logic spi_baud;
 divide_by_n #(5) div_n(clk_i, rst_i, spi_baud);
 
+// main state
 localparam IDLE             = 0;
-localparam READ_STATUS      = 1;
-localparam READ             = 2;
-localparam WRITE            = 3;
+localparam STROBE           = 1;
+localparam PROGRESS         = 2;
 
+logic [3:0] state = IDLE;
+
+// inner
+localparam SND = 1;
+localparam RCV = 2;
+localparam DLY = 3;
+localparam NEXTOP = 3'b111;
+localparam FINISH = 3'b111;
+
+logic [2:0] inner_state = IDLE;
+logic [2:0] next_inner_state = IDLE;
+
+// commands
 localparam CMD_STATUS       = 8'h05;
 localparam CMD_READ         = 8'h03;
 localparam CMD_WRITE        = 8'h05;
 localparam CMD_DEVICEID     = 8'h90;
 localparam CMD_WRITEENABLE  = 8'h06;
 localparam CMD_READJEDEC    = 8'h9F;
-localparam CMD_RELEASE      = 8'hAB;
-
-logic [3:0] state = IDLE;
-
-logic spi_clk_en = 0;
+localparam CMD_POWERUP      = 8'hAB;
 
 // termination signals
 logic ack = 0, rty = 0;
@@ -55,19 +64,13 @@ always_comb begin
         state = IDLE;
     else if (ack || rty)
         state = IDLE;
-    else if (inner_state == SWITCHING_MODE && !we_i)
-        state = READ;
-    else if (inner_state == SWITCHING_MODE && we_i)
-        state = WRITE;
+    else if (inner_state != IDLE)
+        state = PROGRESS;
     else if (stb_i)
-        state = READ_STATUS;
+        state = STROBE;
     else
         state = IDLE;
 end
-
-localparam PAUSE2 = 3'b111;
-logic [2:0] inner_state = 0;
-logic [2:0] next_inner_state = 0;
 
 assign busy = dat_o[0];
 assign write_enabled = dat_o[1];
@@ -91,16 +94,10 @@ end
 
 logic [3:0] dly_cnt = 0;
 logic [31:0] cmd = 0;
+logic [31:0] next_cmd = 0;
 logic [5:0] bits_cnt = 0;
 logic [5:0] bits_to_read = 0;
 logic is_status = 0;
-
-localparam IDL = 0;
-localparam SND = 1;
-localparam RCV = 2;
-localparam DLY = 3;
-localparam SWITCHING_MODE = 3'b110;
-localparam FINISH = 4;
 
 always @(posedge clk_i) begin
     if (inner_state == DLY) begin
@@ -112,53 +109,111 @@ always @(posedge clk_i) begin
             inner_state <= next_inner_state;
         end
     end
-    else if (inner_state == 0 && state == READ_STATUS) begin
-        spi_cs <= 0;
-        spi_clk <= 1;
+    else if (inner_state == IDLE && state == STROBE) begin
+        // always starting with RELEASE POWER DOWN
 
-        cmd <= {CMD_RELEASE, 24'b0};
-        bits_cnt <= 8;
-        bits_to_read <= 0;
-        inner_state <= DLY;
-        next_inner_state <= SND;
-        is_status <= 0;
+        inner_state <= NEXTOP;
+        next_cmd <= CMD_POWERUP;
     end
-    else if (inner_state == SWITCHING_MODE && state == READ) begin
+    else if (inner_state == NEXTOP && next_cmd != 0) begin
         spi_cs <= 0;
         spi_clk <= 1;
 
-        cmd <= {CMD_READJEDEC, adr_i};
-        bits_cnt <= 8;
-        bits_to_read <= 24;
+        cmd <= {next_cmd, adr_i};
         inner_state <= DLY;
         next_inner_state <= SND;
-        is_status <= 0;
+        is_status <= (next_cmd == CMD_STATUS);
+
+        case (next_cmd)
+            CMD_POWERUP: begin
+                bits_cnt <= 8;
+                bits_to_read <= 0;
+                next_cmd <= CMD_STATUS;
+            end
+            CMD_STATUS: begin
+                bits_cnt <= 8;
+                bits_to_read <= 8;
+
+                if (!we_i)
+                    next_cmd <= CMD_READ;
+                else
+                    next_cmd <= CMD_WRITEENABLE;
+            end
+            CMD_WRITEENABLE: begin
+                bits_cnt <= 8;
+                bits_to_read <= 0;
+                next_cmd <= CMD_WRITE;
+            end
+            CMD_READJEDEC: begin
+                bits_cnt <= 8;
+                bits_to_read <= 24;
+                next_cmd <= 0;
+            end
+            CMD_READ: begin
+                bits_cnt <= 32;
+                bits_to_read <= 32;
+                next_cmd <= 0;
+            end
+            default: begin
+                bits_cnt <= 8;
+                bits_to_read <= 0;
+                next_cmd <= 0;
+            end
+        endcase
     end
     else if (state != IDLE) begin
         if (spi_baud && spi_clk) begin  // falling edge
             spi_clk <= ~spi_clk;
 
-            if (inner_state == SND && bits_cnt != 0) begin
-                spi_di <= cmd[31];
-                cmd <= {cmd[30:0], 1'b0};
-                bits_cnt <= bits_cnt - 1;
-            end
-            else if (inner_state == SND && bits_to_read != 0) begin
-                bits_cnt <= bits_to_read;
-                inner_state <= DLY;
-                next_inner_state <= RCV;
-            end
-            else if (inner_state == SND) begin
-                spi_cs <= 1;
-                spi_clk <= 1;
-                inner_state <= DLY;
-                next_inner_state <= SWITCHING_MODE;
+            if (inner_state == SND) begin
+                if (bits_cnt != 0) begin
+                    // sending bits
+                    spi_di <= cmd[31];
+                    cmd <= {cmd[30:0], 1'b0};
+                    bits_cnt <= bits_cnt - 1;
+                end
+                else if (bits_to_read != 0) begin
+                    // we have something to read
+                    bits_cnt <= bits_to_read;
+                    inner_state <= DLY;
+                    next_inner_state <= RCV;
+                end
+                else begin
+                    // temporary CS up, so we can start new operation or
+                    // finish
+                    spi_cs <= 1;
+                    spi_clk <= 1;
+                    inner_state <= DLY;
+
+                    if (next_cmd)
+                        next_inner_state <= NEXTOP;
+                    else
+                        next_inner_state <= FINISH;
+                end
             end
             else if (inner_state == FINISH) begin
-                inner_state <= IDLE;
                 ack <= 1;
                 spi_cs <= 1;
                 spi_clk <= 1;
+            end
+            else if (inner_state == RCV && bits_cnt == 0) begin
+                inner_state <= DLY;
+
+                if (is_status && busy) begin
+                    rty <= 1;
+                    next_inner_state <= FINISH;
+                end
+                else if (next_cmd != 0) begin
+                    spi_clk <= 1;
+                    spi_cs <= 1;
+                    next_inner_state <= NEXTOP;
+                end
+                else begin
+                    inner_state <= FINISH;
+                    ack <= 1;
+                    spi_clk <= 1;
+                    spi_cs <= 1;
+                end
             end
         end
         else if (spi_baud && !spi_clk) begin    // raising edge
@@ -167,18 +222,6 @@ always @(posedge clk_i) begin
             if (inner_state == RCV) begin
                 bits_cnt <= bits_cnt - 1;
                 dat_o <= {dat_o[30:0], spi_do};
-
-                if (bits_cnt == 1) begin
-                    if (is_status) begin
-                        rty <= busy;
-                        if (!busy) begin
-                            inner_state <= SWITCHING_MODE;
-                        end
-                    end begin
-                        ack <= 1;
-                        inner_state <= IDLE;
-                    end
-                end
             end
         end
     end
@@ -187,100 +230,10 @@ always @(posedge clk_i) begin
             spi_cs <= 1;
             ack <= 0;
             rty <= 0;
-            inner_state <= 0;
+            inner_state <= IDLE;
+            spi_clk <= 1;
         end
-
-        spi_clk <= 1;
     end
 end
-
-/*
-always @(posedge clk_i or posedge rst_i) begin
-    if (rst_i) begin
-        ack <= 0;
-        rty <= 0;
-        inner_state <= 0;
-    end
-    else if (state == READ_STATUS) begin
-        if (inner_state == 0) begin
-            {spi_di, cmd} <= {CMD_STATUS, 1'b0};
-            bits_cnt <= 7;
-            inner_state <= 1;
-            dat_o <= 0;
-
-            ack <= 0;
-            rty <= 0;
-
-            // start counting on the chip side
-            spi_clk_en <= 1;
-        end
-        else if (inner_state == 1 && bits_cnt != 0) begin
-            {spi_di, cmd} <= {cmd, 1'b0};
-            bits_cnt <= bits_cnt - 1;
-        end
-        else if (inner_state == 1) begin
-            spi_di <= 0;
-            bits_cnt <= 8;
-            inner_state <= 2;
-        end
-        else if (inner_state == 2 && bits_cnt != 0) begin
-            dat_o <= {dat_o[30:0], spi_do};
-            bits_cnt <= bits_cnt - 1;
-
-            if (bits_cnt == 1) begin
-                // fail, stop reading
-                rty <= busy;
-                spi_clk_en <= 0;
-                if (!busy) begin
-                    inner_state = SWITCHING_MODE;
-                end
-            end
-        end
-        else if (inner_state == SWITCHING_MODE) begin
-            // start actual reading
-            inner_state <= PAUSE2;
-            {spi_di, cmdadr} <= {CMD_READ, adr_i, 1'b0};
-        end
-        else if (inner_state == PAUSE2) begin
-            // start actual reading
-            inner_state <= 3;
-
-            bits_cnt <= 31;
-            dat_o <= 0;
-
-            ack <= 0;
-            rty <= 0;
-
-            // start counting on the chip side
-            spi_clk_en <= 1;
-        end
-        else if (inner_state == 3 && bits_cnt != 0) begin
-            {spi_di, cmdadr} <= {cmdadr, 1'b0};
-            bits_cnt <= bits_cnt - 1;
-        end
-        else if (inner_state == 3) begin
-            spi_di <= 0;
-            bits_cnt <= 4 * 8;  // read 4 bytes
-            inner_state <= 4;
-        end
-        else if (inner_state == 4 && bits_cnt != 0) begin
-            dat_o <= {dat_o[30:0], spi_do};
-            bits_cnt <= bits_cnt - 1;
-
-            if (bits_cnt == 1) begin
-                // done, stop reading
-                ack <= 1;
-                spi_clk_en <= 0;
-            end
-        end
-    end
-    else begin
-        rty <= 0;
-        ack <= 0;
-        inner_state <= 0;
-        spi_clk_en <= 0;
-    end
-end
-*/
 
 endmodule

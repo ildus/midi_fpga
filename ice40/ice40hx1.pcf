@@ -23,3 +23,9 @@ set_io spi_cs   49
 
 set_io -pullup yes btn2_pin_1  4
 set_io -pullup yes btn2_pin_2  7
+set_io -pullup yes btn3_pin_1  8
+set_io -pullup yes btn3_pin_2  9
+set_io -pullup yes btn4_pin_1  10
+set_io -pullup yes btn4_pin_2  12
+set_io -pullup yes btn5_pin_1  13
+set_io -pullup yes btn5_pin_2  16

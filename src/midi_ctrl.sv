@@ -27,7 +27,13 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
 
     // external buttons
     input logic btn2_pin_1,
-    input logic btn2_pin_2
+    input logic btn2_pin_2,
+    input logic btn3_pin_1,
+    input logic btn3_pin_2,
+    input logic btn4_pin_1,
+    input logic btn4_pin_2,
+    input logic btn5_pin_1,
+    input logic btn5_pin_2
 );
 
 localparam BUTTONS_CNT = 4;
@@ -43,8 +49,8 @@ localparam FIRST_CC_MSG = 8'd46;
 localparam CC_VALUE = 8'b0111_1111;
 localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
-//localparam MEMADDR = 24'h1ffd80;
-localparam MEMADDR = 24'h000000;
+localparam MEMADDR = 24'h1ffd80;
+//localparam MEMADDR = 24'h000000;
 
 logic baud_clk = 0;
 
@@ -79,7 +85,11 @@ logic btn_assigned = 0;
 
 buttons #(.DEBOUNCE_CNT(DEBOUNCE_CNT)) but (
     clk, rst,
-    board_btn, btn2_pin_1, btn2_pin_2,
+    board_btn,
+    btn2_pin_1, btn2_pin_2,
+    btn3_pin_1, btn3_pin_2,
+    btn4_pin_1, btn4_pin_2,
+    btn5_pin_1, btn5_pin_2,
     midi_in_state, save_mode, btn_index);
 
 // spi flash
@@ -91,7 +101,6 @@ logic spi_stb_o = 0;
 
 logic [31:0] spi_dat_i;
 logic spi_ack_i;
-logic spi_err_i;
 logic spi_rty_i;
 
 logic spi_init = 0;
@@ -132,6 +141,7 @@ end
 
 logic [1:0] rty_count = 0;
 logic [2:0] memindex = 0;
+logic ack_processed = 0;
 
 integer i;
 always @(posedge clk) begin
@@ -148,14 +158,17 @@ always @(posedge clk) begin
         spi_stb_o <= 0;
     end
     else if (spi_stb_o) begin
-        if (spi_rty_i == 1) begin
+        if (ack_processed && !spi_ack_i)
+            ack_processed <= 0;
+        else if (spi_rty_i == 1) begin
             /* just cancel and read another time */
             spi_stb_o <= 0;
             rty_count <= rty_count + 1;
         end
-        else if (spi_ack_i == 1) begin
+        else if (spi_ack_i && !ack_processed) begin
+            ack_processed <= 1;
             spi_stb_o <= 0;
-            //mem_init[memindex] <= 1;
+            mem_init[memindex] <= 1;
             memindex <= memindex + 1;
 
             // read from LSB to MSB
@@ -173,9 +186,9 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
         //mem_init[btn_index] <= 1;
     end
-    else if (!spi_rst_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && rty_count != 2'b11) begin
+    else if (!spi_rst_o && !spi_stb_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && rty_count != 2'b11) begin
         spi_stb_o <= 1;
-        spi_adr_o <= MEMADDR;
+        spi_adr_o <= MEMADDR + ((memindex - 1) * 4);
         spi_we_o <= 0;  /* reading */
     end
     `undef ADDR
@@ -226,20 +239,12 @@ always @(posedge clk or negedge rst) begin
     if (!rst) begin
         cmd_trigger_out <= 0;
     end
-    else if (btn_index != 0 && !save_mode) begin
-        if (!mem_init[btn_index]) begin
-            status <= CC_MSG;
-            data1 <= FIRST_CC_MSG + btn_index - 1;
-            data2 <= CC_VALUE;
-            cmd_bits_cnt <= 30;
-            cmd_trigger_out <= 1;
-        end else begin
-            status <= memmap[`ADDR];
-            data1 <= memmap[`ADDR + 1];
-            data2 <= memmap[`ADDR + 2];
-            cmd_bits_cnt <= memmap[`ADDR + 3];
-            cmd_trigger_out <= 1;
-        end
+    else if (btn_index != 0 && !save_mode && mem_init[btn_index]) begin
+        status <= memmap[`ADDR];
+        data1 <= memmap[`ADDR + 1];
+        data2 <= memmap[`ADDR + 2];
+        cmd_bits_cnt <= memmap[`ADDR + 3];
+        cmd_trigger_out <= 1;
     end
     else begin
         cmd_trigger_out <= 0;
