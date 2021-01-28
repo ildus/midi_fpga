@@ -17,10 +17,10 @@ module midi_ctrl #(parameter BAUD_CNT_HALF = 3200 / 2, parameter DEBOUNCE_CNT = 
     output logic led2,
 
     //spi flash
-    input logic spi_do,
     output logic spi_clk,
     output logic spi_cs,
     output logic spi_di,
+    input logic spi_do,
 
     // debug
     output logic [7:0] debug,
@@ -98,10 +98,10 @@ logic spi_init = 0;
 logic spi_rst_o = 0;
 
 spi_flash flash(
-    spi_clk_o, spi_rst_o,                                    // syscon
+    clk, spi_rst_o,                                         // syscon
     spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
-    spi_do, spi_clk, spi_cs, spi_di);                       // pins
+    spi_clk, spi_cs, spi_di, spi_do);                       // pins
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin
@@ -119,15 +119,6 @@ always @(posedge clk or negedge rst) begin
     end
 end
 
-always @(posedge clk) begin
-    if (!rst) begin
-        spi_clk_o <= 1;
-    end
-    else begin
-        spi_clk_o <= ~spi_clk_o;
-    end
-end
-
 always_comb begin
     debug[0] = spi_rst_o;
     debug[1] = spi_stb_o;
@@ -135,8 +126,8 @@ always_comb begin
     debug[3] = spi_clk;
     debug[4] = spi_ack_i;
     debug[5] = spi_rty_i;
-    debug[6] = spi_di;
-    debug[7] = spi_do;
+    debug[6] = spi_do;
+    debug[7] = spi_di;
 end
 
 logic [1:0] rty_count = 0;

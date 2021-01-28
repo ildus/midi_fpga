@@ -47,8 +47,7 @@ upload_ice40: ${PADDED}
 	ssh banana 'echo 25 > /sys/class/gpio/export && echo out > /sys/class/gpio/gpio25/direction'
 	ssh banana 'gpio load spi'
 	ssh banana 'flashrom -p linux_spi:dev=/dev/spidev0.0,spispeed=20000 -w ~/${PRJNAME}.bin'
-	ssh banana 'echo in > /sys/class/gpio/gpio25/direction'
-	ssh banana 'echo 25 > /sys/class/gpio/unexport'
+	ssh banana 'echo in > /sys/class/gpio/gpio25/direction && echo 25 > /sys/class/gpio/unexport'
 
 ${PADDED}: ${BUILDDIR_ICE40}/${PRJNAME}.bin
 	rm -f ${PADDED}
