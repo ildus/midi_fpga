@@ -7,6 +7,7 @@ module spi_flash
     input logic [31:0] dat_i,
     input logic we_i,
     input logic stb_i,
+    input logic tga_i,  /* we_i & tga_i - erase sector by address */
 
     output logic [31:0] dat_o,
     output logic ack_o,
@@ -30,9 +31,8 @@ divide_by_n #(5) div_n(clk_i, rst_i, spi_baud);
 // main state
 localparam IDLE             = 0;
 localparam STROBE           = 1;
-localparam PROGRESS         = 2;
 
-logic [3:0] state = IDLE;
+logic state = IDLE;
 
 // inner
 localparam SND = 1;
@@ -47,33 +47,36 @@ logic [2:0] next_inner_state = IDLE;
 // commands
 localparam CMD_STATUS       = 8'h05;
 localparam CMD_READ         = 8'h03;
-localparam CMD_WRITE        = 8'h05;
 localparam CMD_DEVICEID     = 8'h90;
-localparam CMD_WRITEENABLE  = 8'h06;
 localparam CMD_READJEDEC    = 8'h9F;
 localparam CMD_POWERUP      = 8'hAB;
+localparam CMD_POWERDOWN    = 8'hB9;
+localparam CMD_WRITEENABLE  = 8'h06;
+localparam CMD_SECTORERASE  = 8'h20;
+localparam CMD_WRITE        = 8'h02;
+
+// only for FSM, actually we use CMD_WRITEENABLE
+localparam CMD_PSEUDO_ENABLE_WRITE = 8'h10;
+localparam CMD_PSEUDO_ENABLE_ERASE = 8'h11;
 
 // termination signals
 logic ack = 0, rty = 0;
 
 assign ack_o = stb_i && ack;
 assign rty_o = stb_i && rty;
+assign busy = dat_o[0];
+assign write_enabled = dat_o[1];
 
 always_comb begin
     if (rst_i)
         state = IDLE;
     else if (ack || rty)
         state = IDLE;
-    else if (inner_state != IDLE)
-        state = PROGRESS;
     else if (stb_i)
         state = STROBE;
     else
         state = IDLE;
 end
-
-assign busy = dat_o[0];
-assign write_enabled = dat_o[1];
 
 `ifdef COCOTB_SIM
 logic [1:0]  do_cnt = 0;
@@ -130,16 +133,30 @@ always @(posedge clk_i) begin
                 bits_to_read <= 0;
                 next_cmd <= CMD_STATUS;
             end
+            CMD_POWERDOWN: begin
+                bits_cnt <= 8;
+                bits_to_read <= 0;
+                next_cmd <= 0;
+            end
             CMD_STATUS: begin
                 bits_cnt <= 8;
                 bits_to_read <= 8;
 
-                if (!we_i)
-                    next_cmd <= CMD_READ;
+                if (tga_i && we_i)
+                    next_cmd <= CMD_PSEUDO_ENABLE_ERASE;
+                else if (we_i)
+                    next_cmd <= CMD_PSEUDO_ENABLE_WRITE;
                 else
-                    next_cmd <= CMD_WRITEENABLE;
+                    next_cmd <= CMD_READ;
             end
-            CMD_WRITEENABLE: begin
+            CMD_PSEUDO_ENABLE_ERASE: begin
+                cmd <= {CMD_WRITEENABLE, adr_i};
+                bits_cnt <= 8;
+                bits_to_read <= 0;
+                next_cmd <= CMD_SECTORERASE;
+            end
+            CMD_PSEUDO_ENABLE_WRITE: begin
+                cmd <= {CMD_WRITEENABLE, adr_i};
                 bits_cnt <= 8;
                 bits_to_read <= 0;
                 next_cmd <= CMD_WRITE;
@@ -152,7 +169,17 @@ always @(posedge clk_i) begin
             CMD_READ: begin
                 bits_cnt <= 32;
                 bits_to_read <= 32;
-                next_cmd <= 0;
+                next_cmd <= CMD_POWERDOWN;
+            end
+            CMD_SECTORERASE: begin
+                bits_cnt <= 32;
+                bits_to_read <= 0;
+                next_cmd <= CMD_POWERDOWN;
+            end
+            CMD_WRITE: begin
+                bits_cnt <= 64;
+                bits_to_read <= 0;
+                next_cmd <= CMD_POWERDOWN;
             end
             default: begin
                 bits_cnt <= 8;

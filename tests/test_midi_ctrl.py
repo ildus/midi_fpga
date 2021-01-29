@@ -4,7 +4,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from cocotb.binary import BinaryValue
 
-async def setup_dut(dut):
+async def setup_dut(dut, init_spi=True):
     clock = Clock(dut.clk, 10, units="ns")
     cocotb.fork(clock.start())
 
@@ -12,6 +12,10 @@ async def setup_dut(dut):
     dut.rst <= 0
     await FallingEdge(dut.clk)
     dut.rst <= 1
+
+    if not init_spi:
+        await FallingEdge(dut.spi_rst_o)
+        dut.memindex <= 0b111
 
 async def send_command(dut, is_status=False, and_wait=False):
     ''' send 8 bits of some data '''
@@ -145,28 +149,12 @@ async def test_midi_in_3bytes(dut):
     assert dut.led2 == 1
 
 @cocotb.test()
-async def test_midi_out_on_button(dut):
-    await setup_dut(dut)
-
-    dut.btn1 <= False
-    await FallingEdge(dut.clk)
-    dut.btn1 <= True
-
-    status = await read_midi_command(dut)
-    data1 = await read_midi_command(dut)
-    data2 = await read_midi_command(dut)
-
-    assert status == dut.CC_MSG
-    assert data1 == dut.FIRST_CC_MSG
-    assert data2 == dut.CC_VALUE
-
-@cocotb.test()
 async def test_btn_assign(dut):
     """ Test MIDI and assigning to button """
 
-    await setup_dut(dut)
+    await setup_dut(dut, init_spi=False)
 
-    status = await send_command(dut, is_status = True)
+    status = await send_command(dut, is_status=True)
     data1 = await send_command(dut)
     data2 = await send_command(dut, and_wait=True)
 
@@ -187,8 +175,7 @@ async def test_btn_assign(dut):
 
     dut.but.btn1_raise <= False
 
-    for i in range(2):
-        await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.clk)
 
     assert dut.memmap[0] == status
     assert dut.memmap[1] == data1
@@ -197,7 +184,7 @@ async def test_btn_assign(dut):
 
 @cocotb.test()
 async def test_midi_out_on_button_after_assign(dut):
-    await setup_dut(dut)
+    await setup_dut(dut, init_spi=False)
 
     status = await send_command(dut, is_status = True)
     data1 = await send_command(dut)
@@ -208,12 +195,15 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.midi_in_state == 1
 
     await FallingEdge(dut.clk)
-    dut.btn2 <= 1
-    await FallingEdge(dut.but.btn2_raise)
+    dut.but.btn3_raise <= 1
     await FallingEdge(dut.clk)
+
+    # after this clock btn_index will be set
+    await FallingEdge(dut.clk)
+    dut.but.btn3_raise <= False
+
     assert dut.btn_index == 2
     assert dut.save_mode == 1
-    assert dut.but.btn2_raise == 0
     await FallingEdge(dut.clk)
     assert dut.btn_index == 0
     assert dut.cmd_trigger_out == 0

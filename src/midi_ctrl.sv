@@ -43,6 +43,13 @@ localparam MEMSIZE = BUTTONS_CNT * 4;
 logic [7:0] memmap [0:MEMSIZE - 1];
 logic [BUTTONS_CNT:1] mem_init;
 
+integer i;
+initial begin
+    for (i = 1; i <= BUTTONS_CNT; i++) begin
+        mem_init[i] <= 0;
+    end
+end
+
 /* just some sample commands */
 localparam CC_MSG = 8'hB0; // CC message, channel 1
 localparam PC_MSG = 8'hC0; // PC message, channel 1
@@ -99,6 +106,7 @@ logic [23:0] spi_adr_o = 0;
 logic [31:0] spi_dat_o = 0;
 logic spi_we_o = 0;
 logic spi_stb_o = 0;
+logic spi_tga_o = 0;
 
 logic [31:0] spi_dat_i;
 logic spi_ack_i;
@@ -109,7 +117,7 @@ logic spi_rst_o = 0;
 
 spi_flash flash(
     clk, spi_rst_o,                                         // syscon
-    spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o,              // output
+    spi_adr_o, spi_dat_o, spi_we_o, spi_stb_o, spi_tga_o,   // output
     spi_dat_i, spi_ack_i, spi_rty_i,                        // input
     spi_clk, spi_cs, spi_di, spi_do);                       // pins
 
@@ -141,9 +149,9 @@ end
 
 logic fail = 0;
 logic [2:0] memindex = 0;
+logic [2:0] memsave = 0;
 logic ack_processed = 0;
 
-integer i;
 always @(posedge clk) begin
     if (spi_rst_o) begin
         memindex <= 1;
@@ -182,12 +190,20 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 1] <= data1_in;
         memmap[`ADDR(btn_index) + 2] <= data2_in;
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
-        //mem_init[btn_index] <= 1;
+        //memsave <= btn_index;
     end
     else if (!spi_rst_o && !spi_stb_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && !fail) begin
         spi_stb_o <= 1;
         spi_adr_o <= MEMADDR + ((memindex - 1) * 4);
         spi_we_o <= 0;  /* reading */
+        spi_tga_o <= 0;
+    end
+    else if (!spi_rst_o && !spi_stb_o && memsave != 0 && !fail) begin
+        spi_stb_o <= 1;
+        spi_adr_o <= MEMADDR;
+        spi_we_o <= 1;  /* writing */
+        spi_tga_o <= 1; /* erasing */
+        memsave <= 0;
     end
 end
 
