@@ -28,21 +28,19 @@ module spi_flash
 logic spi_baud;
 divide_by_n #(5) div_n(clk_i, rst_i, spi_baud);
 
-// main state
-localparam IDLE             = 0;
-localparam STROBE           = 1;
+// on-going communication status
+logic wb_active = 0;
 
-logic state = IDLE;
+// spi operation state
+localparam IDLE     = 0;
+localparam SND      = 1;
+localparam RCV      = 2;
+localparam DLY      = 3;
+localparam NEXTOP   = 3'b111;
+localparam FINISH   = 3'b111;
 
-// inner
-localparam SND = 1;
-localparam RCV = 2;
-localparam DLY = 3;
-localparam NEXTOP = 3'b111;
-localparam FINISH = 3'b111;
-
-logic [2:0] inner_state = IDLE;
-logic [2:0] next_inner_state = IDLE;
+logic [2:0] state = IDLE;
+logic [2:0] next_state = IDLE;
 
 // commands
 localparam CMD_STATUS       = 8'h05;
@@ -69,13 +67,13 @@ assign write_enabled = dat_o[1];
 
 always_comb begin
     if (rst_i)
-        state = IDLE;
+        wb_active = 0;
     else if (ack || rty)
-        state = IDLE;
+        wb_active = 0;
     else if (stb_i)
-        state = STROBE;
+        wb_active = 1;
     else
-        state = IDLE;
+        wb_active = 0;
 end
 
 `ifdef COCOTB_SIM
@@ -103,28 +101,28 @@ logic [5:0] bits_to_read = 0;
 logic is_status = 0;
 
 always @(posedge clk_i) begin
-    if (inner_state == DLY) begin
+    if (state == DLY) begin
         if (spi_baud)
             dly_cnt <= dly_cnt + 1;
 
         if (dly_cnt[3] == 1) begin
             dly_cnt <= 0;
-            inner_state <= next_inner_state;
+            state <= next_state;
         end
     end
-    else if (inner_state == IDLE && state == STROBE) begin
+    else if (wb_active && state == IDLE) begin
         // always starting with RELEASE POWER DOWN
 
-        inner_state <= NEXTOP;
+        state <= NEXTOP;
         next_cmd <= CMD_POWERUP;
     end
-    else if (inner_state == NEXTOP && next_cmd != 0) begin
+    else if (state == NEXTOP && next_cmd != 0) begin
         spi_cs <= 0;
         spi_clk <= 1;
 
         cmd <= {next_cmd, adr_i};
-        inner_state <= DLY;
-        next_inner_state <= SND;
+        state <= DLY;
+        next_state <= SND;
         is_status <= (next_cmd == CMD_STATUS);
 
         case (next_cmd)
@@ -188,11 +186,11 @@ always @(posedge clk_i) begin
             end
         endcase
     end
-    else if (state != IDLE) begin
+    else if (wb_active) begin
         if (spi_baud && spi_clk) begin  // falling edge
             spi_clk <= ~spi_clk;
 
-            if (inner_state == SND) begin
+            if (state == SND) begin
                 if (bits_cnt != 0) begin
                     // sending bits
                     spi_di <= cmd[31];
@@ -202,41 +200,41 @@ always @(posedge clk_i) begin
                 else if (bits_to_read != 0) begin
                     // we have something to read
                     bits_cnt <= bits_to_read;
-                    inner_state <= DLY;
-                    next_inner_state <= RCV;
+                    state <= DLY;
+                    next_state <= RCV;
                 end
                 else begin
                     // temporary CS up, so we can start new operation or
                     // finish
                     spi_cs <= 1;
                     spi_clk <= 1;
-                    inner_state <= DLY;
+                    state <= DLY;
 
                     if (next_cmd)
-                        next_inner_state <= NEXTOP;
+                        next_state <= NEXTOP;
                     else
-                        next_inner_state <= FINISH;
+                        next_state <= FINISH;
                 end
             end
-            else if (inner_state == FINISH) begin
+            else if (state == FINISH) begin
                 ack <= 1;
                 spi_cs <= 1;
                 spi_clk <= 1;
             end
-            else if (inner_state == RCV && bits_cnt == 0) begin
-                inner_state <= DLY;
+            else if (state == RCV && bits_cnt == 0) begin
+                state <= DLY;
 
                 if (is_status && busy) begin
                     rty <= 1;
-                    next_inner_state <= FINISH;
+                    next_state <= FINISH;
                 end
                 else if (next_cmd != 0) begin
                     spi_clk <= 1;
                     spi_cs <= 1;
-                    next_inner_state <= NEXTOP;
+                    next_state <= NEXTOP;
                 end
                 else begin
-                    inner_state <= FINISH;
+                    state <= FINISH;
                     ack <= 1;
                     spi_clk <= 1;
                     spi_cs <= 1;
@@ -246,7 +244,7 @@ always @(posedge clk_i) begin
         else if (spi_baud && !spi_clk) begin    // raising edge
             spi_clk <= ~spi_clk;
 
-            if (inner_state == RCV) begin
+            if (state == RCV) begin
                 bits_cnt <= bits_cnt - 1;
                 dat_o <= {dat_o[30:0], spi_do};
             end
@@ -257,7 +255,7 @@ always @(posedge clk_i) begin
             spi_cs <= 1;
             ack <= 0;
             rty <= 0;
-            inner_state <= IDLE;
+            state <= IDLE;
             spi_clk <= 1;
         end
     end

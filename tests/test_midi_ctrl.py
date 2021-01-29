@@ -4,7 +4,7 @@ from cocotb.clock import Clock
 from cocotb.triggers import FallingEdge, RisingEdge
 from cocotb.binary import BinaryValue
 
-async def setup_dut(dut, init_spi=True):
+async def setup_dut(dut):
     clock = Clock(dut.clk, 10, units="ns")
     cocotb.fork(clock.start())
 
@@ -12,10 +12,6 @@ async def setup_dut(dut, init_spi=True):
     dut.rst <= 0
     await FallingEdge(dut.clk)
     dut.rst <= 1
-
-    if not init_spi:
-        await FallingEdge(dut.spi_rst_o)
-        dut.memindex <= 0b111
 
 async def send_command(dut, is_status=False, and_wait=False):
     ''' send 8 bits of some data '''
@@ -152,7 +148,7 @@ async def test_midi_in_3bytes(dut):
 async def test_btn_assign(dut):
     """ Test MIDI and assigning to button """
 
-    await setup_dut(dut, init_spi=False)
+    await setup_dut(dut)
 
     status = await send_command(dut, is_status=True)
     data1 = await send_command(dut)
@@ -184,7 +180,11 @@ async def test_btn_assign(dut):
 
 @cocotb.test()
 async def test_midi_out_on_button_after_assign(dut):
-    await setup_dut(dut, init_spi=False)
+    await setup_dut(dut)
+
+    # wait for spi initialization
+    for i in range(2000):
+        await FallingEdge(dut.clk)
 
     status = await send_command(dut, is_status = True)
     data1 = await send_command(dut)

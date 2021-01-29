@@ -154,15 +154,13 @@ logic ack_processed = 0;
 
 always @(posedge clk) begin
     if (spi_rst_o) begin
+		spi_stb_o <= 0;
         memindex <= 1;
         fail <= 0;
 
         for (i = 1; i <= BUTTONS_CNT; i++) begin
             mem_init[i] <= 0;
         end
-    end
-    else if (spi_rst_o) begin
-        spi_stb_o <= 0;
     end
     else if (spi_stb_o) begin
         if (ack_processed && !spi_ack_i)
