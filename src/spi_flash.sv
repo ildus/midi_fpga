@@ -36,8 +36,9 @@ localparam IDLE     = 0;
 localparam SND      = 1;
 localparam RCV      = 2;
 localparam DLY      = 3;
-localparam NEXTOP   = 3'b111;
-localparam FINISH   = 3'b111;
+localparam LNGDLY   = 4;
+localparam NEXTOP   = 5;
+localparam FINISH   = 6;
 
 logic [2:0] state = IDLE;
 logic [2:0] next_state = IDLE;
@@ -56,6 +57,7 @@ localparam CMD_WRITE        = 8'h02;
 // only for FSM, actually we use CMD_WRITEENABLE
 localparam CMD_PSEUDO_ENABLE_WRITE = 8'h10;
 localparam CMD_PSEUDO_ENABLE_ERASE = 8'h11;
+localparam CMD_PSEUDO_WAIT         = 8'h12;
 
 // termination signals
 logic ack = 0, rty = 0;
@@ -63,7 +65,6 @@ logic ack = 0, rty = 0;
 assign ack_o = stb_i && ack;
 assign rty_o = stb_i && rty;
 assign busy = dat_o[0];
-assign write_enabled = dat_o[1];
 
 always_comb begin
     if (rst_i)
@@ -93,15 +94,24 @@ always @(negedge clk_i) begin
 end
 `endif
 
-logic [3:0] dly_cnt = 0;
+logic [26:0] dly_cnt = 0;
 logic [31:0] cmd = 0;
 logic [31:0] next_cmd = 0;
-logic [5:0] bits_cnt = 0;
+logic [6:0] bits_cnt = 0;
 logic [5:0] bits_to_read = 0;
 logic is_status = 0;
+logic write_mode  = 0;
 
 always @(posedge clk_i) begin
-    if (state == DLY) begin
+    if (state == LNGDLY) begin
+        // 400 ms
+        dly_cnt <= dly_cnt + 1;
+        if (dly_cnt[26] == 1) begin
+            dly_cnt <= 0;
+            state <= next_state;
+        end
+    end
+    else if (state == DLY) begin
         if (spi_baud)
             dly_cnt <= dly_cnt + 1;
 
@@ -124,6 +134,7 @@ always @(posedge clk_i) begin
         state <= DLY;
         next_state <= SND;
         is_status <= (next_cmd == CMD_STATUS);
+        write_mode <= 0;
 
         case (next_cmd)
             CMD_POWERUP: begin
@@ -172,9 +183,15 @@ always @(posedge clk_i) begin
             CMD_SECTORERASE: begin
                 bits_cnt <= 32;
                 bits_to_read <= 0;
+                next_cmd <= CMD_PSEUDO_WAIT;
+            end
+            CMD_PSEUDO_WAIT: begin
+                state <= LNGDLY;
                 next_cmd <= CMD_POWERDOWN;
+                next_state <= NEXTOP;
             end
             CMD_WRITE: begin
+                write_mode <= 1;
                 bits_cnt <= 64;
                 bits_to_read <= 0;
                 next_cmd <= CMD_POWERDOWN;
@@ -194,8 +211,14 @@ always @(posedge clk_i) begin
                 if (bits_cnt != 0) begin
                     // sending bits
                     spi_di <= cmd[31];
-                    cmd <= {cmd[30:0], 1'b0};
                     bits_cnt <= bits_cnt - 1;
+
+                    if (write_mode && bits_cnt == 33) begin
+                        // we sent an address, now send the data
+                        cmd <= dat_i;
+                    end
+                    else
+                        cmd <= {cmd[30:0], 1'b0};
                 end
                 else if (bits_to_read != 0) begin
                     // we have something to read

@@ -150,6 +150,10 @@ async def test_btn_assign(dut):
 
     await setup_dut(dut)
 
+    # wait for spi initialization
+    for i in range(2000):
+        await FallingEdge(dut.clk)
+
     status = await send_command(dut, is_status=True)
     data1 = await send_command(dut)
     data2 = await send_command(dut, and_wait=True)
@@ -177,6 +181,9 @@ async def test_btn_assign(dut):
     assert dut.memmap[1] == data1
     assert dut.memmap[2] == data2
     assert dut.memmap[3].value == 30
+
+    for i in range(1000):
+        await FallingEdge(dut.clk)
 
 @cocotb.test()
 async def test_midi_out_on_button_after_assign(dut):

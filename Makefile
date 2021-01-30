@@ -62,7 +62,7 @@ ${BUILDDIR_ICE40}/${PRJNAME}.asc: ${BUILDDIR_ICE40}/${PRJNAME}.json ${PCF}
 	nextpnr-ice40 --hx1k --package vq100 --json ${BUILDDIR_ICE40}/${PRJNAME}.json --pcf ${PCF}  --asc $@
 
 ${BUILDDIR_ICE40}/${PRJNAME}.json: ${BUILDDIR}/a.out
-	yosys -p "read_verilog -sv ${SOURCES}; synth_ice40 -top ${TOPLEVEL} -json $@"
+	yosys -p "read_verilog -sv ${SOURCES}; synth_ice40 -nocarry -abc2 -top ${TOPLEVEL} -json $@"
 
 .PHONY: check
 check:

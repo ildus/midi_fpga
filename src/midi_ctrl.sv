@@ -147,30 +147,45 @@ always_comb begin
     debug[6] = midi_tx;
 end
 
-logic fail = 0;
 logic [2:0] memindex = 0;
-logic [2:0] memsave = 0;
 logic ack_processed = 0;
+logic [10:0] wait_cnt = 0;  /* 400 ms */
+
+// writing proces
+logic memsave = 0;
+logic erased = 0;
 
 always @(posedge clk) begin
     if (spi_rst_o) begin
 		spi_stb_o <= 0;
         memindex <= 1;
-        fail <= 0;
+        memsave <= 0;
+        wait_cnt <= 0;
 
         for (i = 1; i <= BUTTONS_CNT; i++) begin
             mem_init[i] <= 0;
         end
     end
+    else if (wait_cnt[10] == 0) begin
+        wait_cnt <= wait_cnt + 1;
+    end
     else if (spi_stb_o) begin
         if (ack_processed && !spi_ack_i)
             ack_processed <= 0;
-        else if (spi_rty_i == 1) begin
+        else if (spi_rty_i) begin
             /* just cancel and read another time */
-            fail <= 1;
             spi_stb_o <= 0;
+            wait_cnt <= 0;
+        end
+        else if (spi_ack_i && spi_we_o && !ack_processed) begin
+            // writing
+            ack_processed <= 1;
+            spi_stb_o <= 0;
+            mem_init[memsave] <= 1;
+            memsave <= memsave + 1;
         end
         else if (spi_ack_i && !ack_processed) begin
+            // reading
             ack_processed <= 1;
             spi_stb_o <= 0;
             mem_init[memindex] <= 1;
@@ -188,20 +203,38 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 1] <= data1_in;
         memmap[`ADDR(btn_index) + 2] <= data2_in;
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
-        memsave <= btn_index;
+        memsave <= 1;
+
+        for (i = 1; i <= BUTTONS_CNT; i++) begin
+            mem_init[i] <= 0;
+        end
     end
-    else if (!spi_rst_o && !spi_stb_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && !fail) begin
+    else if (mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
         spi_stb_o <= 1;
         spi_adr_o <= MEMADDR + ((memindex - 1) * 4);
         spi_we_o <= 0;  /* reading */
         spi_tga_o <= 0;
     end
-    else if (!spi_rst_o && !spi_stb_o && memsave != 0 && !fail) begin
+    /*
+    else if (memsave != 0 && !erased) begin
+        // this will erase the whole sector where MEMADDR is located
         spi_stb_o <= 1;
         spi_adr_o <= MEMADDR;
-        spi_we_o <= 1;  /* writing */
-        spi_tga_o <= 1; /* erasing */
-        memsave <= 0;
+        spi_we_o <= 1;  // writing
+        spi_tga_o <= 1; // erase sector
+        erased <= 1;
+        ack_processed <= 0;
+    end
+    */
+    else if (mem_init[memsave] == 0 && memsave <= BUTTONS_CNT) begin
+        spi_stb_o <= 1;
+        spi_adr_o <= MEMADDR + ((memsave - 1) * 4);
+        spi_we_o <= 1;  // writing
+        spi_tga_o <= 0; // without erasing
+        spi_dat_o <= {  memmap[`ADDR(memsave)],
+                        memmap[`ADDR(memsave) + 1],
+                        memmap[`ADDR(memsave) + 2],
+                        memmap[`ADDR(memsave) + 3]};
     end
 end
 
