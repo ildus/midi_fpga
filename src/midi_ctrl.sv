@@ -188,7 +188,7 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 1] <= data1_in;
         memmap[`ADDR(btn_index) + 2] <= data2_in;
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
-        //memsave <= btn_index;
+        memsave <= btn_index;
     end
     else if (!spi_rst_o && !spi_stb_o && mem_init[memindex] == 0 && memindex <= BUTTONS_CNT && !fail) begin
         spi_stb_o <= 1;
