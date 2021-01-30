@@ -112,7 +112,7 @@ logic [31:0] spi_dat_i;
 logic spi_ack_i;
 logic spi_rty_i;
 
-logic spi_init = 0;
+logic [3:0] spi_init_cnt = 0;
 logic spi_rst_o = 0;
 
 spi_flash flash(
@@ -123,16 +123,16 @@ spi_flash flash(
 
 always @(posedge clk) begin
     if (!rst) begin
-        spi_init <= 0;
+        spi_init_cnt <= 0;
         spi_rst_o <= 1;
     end
     else begin
-        if (!spi_init) begin
-            spi_rst_o <= 1;
-            spi_init <= 1;
+        if (spi_init_cnt[3]) begin
+            spi_rst_o <= 0;
         end
         else begin
-            spi_rst_o <= 0;
+            spi_init_cnt <= spi_init_cnt + 1;
+            spi_rst_o <= 1;
         end
     end
 end
