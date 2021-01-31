@@ -191,14 +191,14 @@ always @(posedge clk) begin
         else if (spi_ack_i) begin
             spi_stb_o <= 0;
 
-            if (spi_ack_i && spi_we_o && spi_tga_o) begin
+            if (spi_we_o && spi_tga_o) begin
                 erased <= 1;
 
                 /* wait and repeat */
                 wait_cnt <= 0;
                 wait_long <= 1;
             end
-            else if (spi_ack_i && spi_we_o) begin
+            else if (spi_we_o) begin
                 // writing
                 mem_init[memsave] <= 1;
                 memsave <= memsave + 1;
@@ -207,7 +207,7 @@ always @(posedge clk) begin
                 wait_cnt <= 0;
                 wait_long <= 0;
             end
-            else if (spi_ack_i) begin
+            else begin
                 // reading
                 mem_init[memindex] <= 1;
                 memindex <= memindex + 1;
