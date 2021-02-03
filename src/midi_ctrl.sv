@@ -41,14 +41,14 @@ localparam MEMSIZE = BUTTONS_CNT * 4;
 
 `define ADDR(b) ((b - 1) * 4)
 logic [7:0] memmap [0:MEMSIZE - 1];
-logic [BUTTONS_CNT + 1:1] mem_init;
+logic [BUTTONS_CNT:1] mem_init = 0;
 
-integer i;
-initial begin
-    for (i = 1; i <= BUTTONS_CNT + 1; i++) begin
-        mem_init[i] <= 0;
-    end
-end
+// reading
+logic [2:0] memindex = 0;
+
+// writing proces
+logic [2:0] memsave = 0;
+logic erased = 0;
 
 /* just some sample commands */
 localparam CC_MSG = 8'hB0; // CC message, channel 1
@@ -58,7 +58,6 @@ localparam CC_VALUE = 8'b0111_1111;
 localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
 localparam MEMADDR = 24'h1ffd80;
-//localparam MEMADDR = 24'h000000;
 
 logic baud_clk = 0;
 
@@ -73,7 +72,7 @@ logic [7:0] data2_in;
 logic [1:0] bytes_cnt_in;
 logic midi_cmd_completed;
 
-midi_in din(baud_clk, rst, midi_rx, midi_cmd_completed, status_in, data1_in, data2_in, bytes_cnt_in);
+midi_in #(.BAUD_CNT_HALF(BAUD_CNT_HALF)) din(clk, rst, midi_rx, midi_cmd_completed, status_in, data1_in, data2_in, bytes_cnt_in);
 
 // midi out
 logic [7:0] status = 0;
@@ -87,7 +86,7 @@ assign led1 = ~midi_tx;
 
 // buttons
 logic save_mode;
-logic [1:0] btn_index;
+logic [2:0] btn_index;
 logic [1:0] midi_in_state;
 logic btn_assigned = 0;
 
@@ -148,12 +147,6 @@ always_comb begin
     debug[7] = spi_rty_i;
 end
 
-logic [2:0] memindex = 0;
-
-// writing proces
-logic [2:0] memsave = 0;
-logic erased = 0;
-
 // delay
 logic wait_long = 0;
 logic [25:0] wait_cnt = 0;  // wait_cnt[19] ~5.2ms, wait_cnt[25] ~ 335 ms
@@ -166,10 +159,7 @@ always @(posedge clk) begin
         wait_long <= 0;
         wait_cnt[25] <= 1;
         wait_cnt[19] <= 1;
-
-        for (i = 1; i <= BUTTONS_CNT + 1; i++) begin
-            mem_init[i] <= 0;
-        end
+        mem_init <= 0;
     end
 `ifndef COCOTB_SIM
     else if (wait_long && wait_cnt[25] == 0) begin
@@ -201,7 +191,11 @@ always @(posedge clk) begin
             else if (spi_we_o) begin
                 // writing
                 mem_init[memsave] <= 1;
-                memsave <= memsave + 1;
+
+                if (memsave == BUTTONS_CNT)
+                    memsave <= 0;
+                else
+                    memsave <= memsave + 1;
 
                 /* wait and repeat */
                 wait_cnt <= 0;
@@ -210,7 +204,11 @@ always @(posedge clk) begin
             else begin
                 // reading
                 mem_init[memindex] <= 1;
-                memindex <= memindex + 1;
+
+                if (memindex == BUTTONS_CNT)
+                    memindex <= 0;
+                else
+                    memindex <= memindex + 1;
 
                 memmap[`ADDR(memindex)] <= spi_dat_i[31:24];
                 memmap[`ADDR(memindex) + 1] <= spi_dat_i[23:16];
@@ -226,14 +224,12 @@ always @(posedge clk) begin
         memmap[`ADDR(btn_index) + 2] <= data2_in;
         memmap[`ADDR(btn_index) + 3] <= bytes_cnt_in * 10;
         memsave <= 1;
-
-        for (i = 1; i <= BUTTONS_CNT + 1; i++) begin
-            mem_init[i] <= 0;
-        end
+        mem_init <= 0;
+        erased <= 0;
     end
-    else if (mem_init[memindex] == 0 && memindex <= BUTTONS_CNT) begin
+    else if (memindex != 0 && mem_init[memindex] == 0) begin
         spi_stb_o <= 1;
-        spi_adr_o <= MEMADDR + ((memindex - 1) * 4);
+        spi_adr_o <= MEMADDR + `ADDR(memindex);
         spi_we_o <= 0;  /* reading */
         spi_tga_o <= 0;
     end
@@ -244,9 +240,9 @@ always @(posedge clk) begin
         spi_we_o <= 1;  // writing
         spi_tga_o <= 1; // erase sector
     end
-    else if (erased && mem_init[memsave] == 0 && memsave <= BUTTONS_CNT) begin
+    else if (memsave != 0 && erased && mem_init[memsave] == 0) begin
         spi_stb_o <= 1;
-        spi_adr_o <= MEMADDR + ((memsave - 1) * 4);
+        spi_adr_o <= MEMADDR + `ADDR(memsave);
         spi_we_o <= 1;  // writing
         spi_tga_o <= 0; // without erasing
         spi_dat_o <= {  memmap[`ADDR(memsave)],
@@ -256,7 +252,7 @@ always @(posedge clk) begin
     end
 end
 
-logic [12:0] clk_cnt = 0;
+logic [10:0] clk_cnt = 0;
 
 always_ff @(posedge clk or negedge rst) begin
     if (!rst) begin

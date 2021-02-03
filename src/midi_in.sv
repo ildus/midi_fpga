@@ -1,5 +1,5 @@
-module midi_in (
-    input logic baud_clk,
+module midi_in #(parameter BAUD_CNT_HALF = 3200 / 2) (
+    input logic clk,    // 100 MHz
     input logic rst,
     input logic midi_rx,
 
@@ -14,8 +14,41 @@ logic [5:0] midi_reading_pos = 0;
 logic [5:0] midi_in_bits = 0;
 logic [7:0] midi_in = 0;
 
+logic read_full_command = 0;
+logic baud_clk_en = 0;
+logic baud_clk;
+logic [10:0] clk_cnt = 0;
+
+always_ff @(posedge clk) begin
+    if (midi_rx && read_full_command)
+        baud_clk_en <= 0;
+    else if (midi_rx == 0)
+        baud_clk_en <= 1;
+end
+
+always_ff @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        clk_cnt <= 0;
+        baud_clk <= 0;
+    end
+    else if (baud_clk_en) begin
+        if (clk_cnt == BAUD_CNT_HALF - 1) begin
+            clk_cnt <= 0;
+            baud_clk <= ~baud_clk;
+        end
+        else begin
+            clk_cnt <= clk_cnt + 1;
+        end
+    end
+    else begin
+        clk_cnt <= 0;
+        baud_clk <= 0;
+    end
+end
+
 always_ff @(posedge baud_clk or negedge rst) begin
     if (!rst) begin
+        read_full_command <= 0;
         completed <= 0;
         midi_reading_pos <= 0;
         midi_in_bits <= 0;
@@ -59,14 +92,17 @@ always_ff @(posedge baud_clk or negedge rst) begin
         midi_in <= 0;
         midi_reading_pos <= 1;
         completed <= 0;
+        read_full_command <= 0;
 
         // we give ourselves 30 baud ticks after each byte starts
         midi_in_bits <= 0;
     end
     else begin
         // this will count to 31 and stop
-        if (bytes_cnt_in != 0 && midi_in_bits == 30)
-            completed <= 1;
+        if (midi_in_bits == 30) begin
+            read_full_command <= 1;
+            completed <= bytes_cnt_in != 0;
+        end
         else if (midi_in_bits != 0)
             midi_in_bits <= midi_in_bits + 1;
     end

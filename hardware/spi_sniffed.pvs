@@ -1,5 +1,5 @@
 [General]
-decode_signals=3
+decode_signals=2
 meta_objs=0
 views=1
 
@@ -92,14 +92,14 @@ color=4281623972
 conv_options=0
 conversion_type=0
 enabled=true
-name=midi_tx
+name=spi_ack_i
 
 [7]
 color=4285878395
 conv_options=0
 conversion_type=0
 enabled=true
-name=midi_rx
+name=spi_rty_i
 
 [8]
 color=4287138437
@@ -285,9 +285,9 @@ name=MIDI
 7\trace_height=30
 8\trace_height=30
 9\trace_height=30
-offset=22 serialization::archive 18 0 0 0 0 143189 40970432 95048034 40257777 69238758 98380127 -8 0 0 6
-scale=1.946299653853266e-08
+offset=22 serialization::archive 18 0 0 0 0 508 6600017 51814004 52876244 50987975 79716217 -8 1 0 6
+scale=3.7970790381529926e-08
 segment_display_mode=3
-splitter_state=@ByteArray(\0\0\0\xff\0\0\0\x1\0\0\0\x2\0\0\0\x89\0\0\x5\x94\x1\0\0\0\x1\x1\0\0\0\x1\0)
-v_offset=-258
+splitter_state=@ByteArray(\0\0\0\xff\0\0\0\x1\0\0\0\x2\0\0\0\x89\0\0\x6\xee\x1\0\0\0\x1\x1\0\0\0\x1\0)
+v_offset=-4
 zero_offset=22 serialization::archive 18 0 0 0 0 0 0 0 0 0 0 0 0 0 6

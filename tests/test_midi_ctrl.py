@@ -12,13 +12,19 @@ async def setup_dut(dut):
     dut.rst <= 0
     await FallingEdge(dut.clk)
     dut.rst <= 1
+    dut.midi_rx <= 1
+    dut.spi_do <= 0
 
-async def send_command(dut, is_status=False, and_wait=False):
+async def generate_midi_in_data(dut, is_status=False, and_wait=False):
     ''' send 8 bits of some data '''
 
     # start bit
     dut.midi_rx <= 0
+    await RisingEdge(dut.baud_clk)
     await FallingEdge(dut.baud_clk)
+
+    for i in range(10):
+        await FallingEdge(dut.clk)
 
     assert dut.din.midi_in == 0
     assert dut.din.midi_reading_pos == 1
@@ -53,7 +59,7 @@ async def send_command(dut, is_status=False, and_wait=False):
 
     return BinaryValue(bindata)
 
-async def read_midi_command(dut):
+async def midi_out_data(dut):
     # wait for start bit
     await FallingEdge(dut.midi_tx)
     await FallingEdge(dut.baud_clk)
@@ -77,7 +83,7 @@ async def test_midi_in(dut):
     # skip one baud_clk for readability of waveform
     await FallingEdge(dut.baud_clk)
 
-    status = await send_command(dut, True)
+    status = await generate_midi_in_data(dut, True)
 
     assert dut.midi_cmd_completed.value == 0
 
@@ -101,8 +107,8 @@ async def test_midi_in_2bytes(dut):
 
     # skip one baud_clk for readability of waveform
     await FallingEdge(dut.baud_clk)
-    status = await send_command(dut, True)
-    data1 = await send_command(dut, False)
+    status = await generate_midi_in_data(dut, True)
+    data1 = await generate_midi_in_data(dut, False)
 
     assert dut.midi_cmd_completed.value == 0
 
@@ -126,9 +132,9 @@ async def test_midi_in_3bytes(dut):
 
     # skip one baud_clk for readability of waveform
     await FallingEdge(dut.baud_clk)
-    status = await send_command(dut, True)
-    data1 = await send_command(dut, False)
-    data2 = await send_command(dut, False)
+    status = await generate_midi_in_data(dut, True)
+    data1 = await generate_midi_in_data(dut, False)
+    data2 = await generate_midi_in_data(dut, False)
 
     assert dut.midi_cmd_completed.value == 0
 
@@ -154,9 +160,9 @@ async def test_btn_assign(dut):
     for i in range(2000):
         await FallingEdge(dut.clk)
 
-    status = await send_command(dut, is_status=True)
-    data1 = await send_command(dut)
-    data2 = await send_command(dut, and_wait=True)
+    status = await generate_midi_in_data(dut, is_status=True)
+    data1 = await generate_midi_in_data(dut)
+    data2 = await generate_midi_in_data(dut, and_wait=True)
 
     assert dut.midi_cmd_completed.value == 1
     assert dut.midi_in_state == 1
@@ -190,12 +196,14 @@ async def test_midi_out_on_button_after_assign(dut):
     await setup_dut(dut)
 
     # wait for spi initialization
-    for i in range(2000):
-        await FallingEdge(dut.clk)
+    await FallingEdge(dut.spi_rst_o)
 
-    status = await send_command(dut, is_status = True)
-    data1 = await send_command(dut)
-    data2 = await send_command(dut, and_wait=True)
+    for i in range(4):
+        await FallingEdge(dut.spi_stb_o)
+
+    status = await generate_midi_in_data(dut, is_status = True)
+    data1 = await generate_midi_in_data(dut)
+    data2 = await generate_midi_in_data(dut, and_wait=True)
 
     assert dut.midi_cmd_completed == 1
     assert dut.btn_assigned == 0
@@ -221,6 +229,13 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.memmap[6] == data2
     assert dut.memmap[7].value == 30
 
+    # wait until the data goes to spi flash
+    for i in range(5):
+        await FallingEdge(dut.spi_stb_o)
+
+    await FallingEdge(dut.clk)
+    assert dut.mem_init[2] == 1
+
     await FallingEdge(dut.clk)
     assert dut.save_mode == 0
     dut.btn_index <= 2
@@ -234,16 +249,12 @@ async def test_midi_out_on_button_after_assign(dut):
     assert dut.data2 == data2
     assert dut.cmd_bits_cnt == 30
 
-    sent_status = await read_midi_command(dut)
+    sent_status = await midi_out_data(dut)
     assert sent_status == status
-    sent_data1 = await read_midi_command(dut)
+    sent_data1 = await midi_out_data(dut)
     assert sent_data1 == data1
-    sent_data2 = await read_midi_command(dut)
+    sent_data2 = await midi_out_data(dut)
     assert sent_data2 == data2
 
-@cocotb.test()
-async def test_spi_flash(dut):
-    await setup_dut(dut)
-
-    for i in range(10000):
+    for i in range(2000):
         await FallingEdge(dut.clk)

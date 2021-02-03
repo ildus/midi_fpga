@@ -63,23 +63,6 @@ assign ack_o = stb_i && ack;
 assign rty_o = stb_i && rty;
 assign busy = dat_o[0];
 
-`ifdef COCOTB_SIM
-logic [1:0]  do_cnt = 0;
-always @(negedge clk_i) begin
-    if (rst_i) begin
-        do_cnt <= 0;
-    end
-    else begin
-        if (do_cnt == 1)
-            spi_do <= 1;
-        else
-            spi_do <= 0;
-
-        do_cnt <= do_cnt + 1;
-    end
-end
-`endif
-
 logic [3:0] dly_cnt = 0;
 logic [31:0] cmd = 0;
 logic [31:0] next_cmd = 0;

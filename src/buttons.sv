@@ -13,7 +13,7 @@ module buttons #(parameter DEBOUNCE_CNT=21) (
     input logic [1:0] midi_in_state,
 
     output logic save_mode,
-    output logic [1:0] btn_index
+    output logic [2:0] btn_index
 );
 
 // raise will appear once
