@@ -59,8 +59,6 @@ localparam PC_VALUE1 = 8'h42;
 localparam PC_VALUE2 = 8'h43;
 localparam MEMADDR = 24'h1ffd80;
 
-logic baud_clk = 0;
-
 // debounce reset button (BUT2)
 logic rst;
 debounce #(.CNT(DEBOUNCE_CNT)) deby (clk, rst_i, rst);
@@ -72,7 +70,8 @@ logic [7:0] data2_in;
 logic [1:0] bytes_cnt_in;
 logic midi_cmd_completed;
 
-midi_in #(.BAUD_CNT_HALF(BAUD_CNT_HALF)) din(clk, rst, midi_rx, midi_cmd_completed, status_in, data1_in, data2_in, bytes_cnt_in);
+midi_in #(.BAUD_CNT_HALF(BAUD_CNT_HALF)) din(
+    clk, rst, midi_rx, midi_cmd_completed, status_in, data1_in, data2_in, bytes_cnt_in);
 
 // midi out
 logic [7:0] status = 0;
@@ -81,7 +80,8 @@ logic [7:0] data2 = 0;
 logic [7:0] cmd_bits_cnt = 0;
 logic cmd_trigger_out = 0;
 
-midi_out dout(clk, baud_clk, rst, midi_tx, status, data1, data2, cmd_bits_cnt, cmd_trigger_out);
+midi_out #(.BAUD_CNT_HALF(BAUD_CNT_HALF)) dout(
+    clk, rst, midi_tx, status, data1, data2, cmd_bits_cnt, cmd_trigger_out);
 assign led1 = ~midi_tx;
 
 // buttons
@@ -249,22 +249,6 @@ always @(posedge clk) begin
                         memmap[`ADDR(memsave) + 1],
                         memmap[`ADDR(memsave) + 2],
                         memmap[`ADDR(memsave) + 3]};
-    end
-end
-
-logic [10:0] clk_cnt = 0;
-
-always_ff @(posedge clk or negedge rst) begin
-    if (!rst) begin
-        clk_cnt <= 0;
-        baud_clk <= 0;
-    end
-    else if (clk_cnt == BAUD_CNT_HALF - 1) begin
-        clk_cnt <= 0;
-        baud_clk <= ~baud_clk;
-    end
-    else begin
-        clk_cnt <= clk_cnt + 1;
     end
 end
 

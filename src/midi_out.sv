@@ -1,6 +1,5 @@
-module midi_out (
+module midi_out #(parameter BAUD_CNT_HALF = 3200 / 2) (
     input logic clk,        /* sysclk */
-    input logic baud_clk,   /* midi clk, 31250 bits/sec */
     input logic rst,
 
     output logic midi_tx,
@@ -12,11 +11,30 @@ module midi_out (
     input logic cmd_set     /* this should be set only one clock period */
 );
 
+// midi clk, 31250 bits/sec
+logic baud_clk = 0;
+logic [10:0] clk_cnt = 0;
+
 logic cmd_trigger_out = 0;
 logic cmd_reset_trigger = 0;
 
 logic [7:0] bits_cnt = 0;
 logic [29:0] midi_out = 0;
+
+
+always_ff @(posedge clk or negedge rst) begin
+    if (!rst) begin
+        clk_cnt <= 0;
+        baud_clk <= 0;
+    end
+    else if (clk_cnt == BAUD_CNT_HALF - 1) begin
+        clk_cnt <= 0;
+        baud_clk <= ~baud_clk;
+    end
+    else begin
+        clk_cnt <= clk_cnt + 1;
+    end
+end
 
 always @(posedge clk or negedge rst) begin
     if (!rst) begin

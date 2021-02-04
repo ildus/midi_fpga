@@ -20,8 +20,8 @@ async def generate_midi_in_data(dut, is_status=False, and_wait=False):
 
     # start bit
     dut.midi_rx <= 0
-    await RisingEdge(dut.baud_clk)
-    await FallingEdge(dut.baud_clk)
+    await RisingEdge(dut.din.baud_clk)
+    await FallingEdge(dut.din.baud_clk)
 
     for i in range(10):
         await FallingEdge(dut.clk)
@@ -45,32 +45,32 @@ async def generate_midi_in_data(dut, is_status=False, and_wait=False):
 
         dut.midi_rx <= val
         bindata = str(val) + bindata
-        await FallingEdge(dut.baud_clk)
+        await FallingEdge(dut.din.baud_clk)
 
     # stop bit
     dut.midi_rx <= 1
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.baud_clk)
 
     if and_wait:
         # just some empty period of data
         for i in range(30):
             dut.midi_rx <= 1
-            await FallingEdge(dut.baud_clk)
+            await FallingEdge(dut.dout.baud_clk)
 
     return BinaryValue(bindata)
 
 async def midi_out_data(dut):
     # wait for start bit
-    await FallingEdge(dut.midi_tx)
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.midi_tx)
+    await FallingEdge(dut.dout.baud_clk)
 
     bindata = ''
     for i in range(8):
-        await FallingEdge(dut.baud_clk)
+        await FallingEdge(dut.dout.baud_clk)
         bindata = str(dut.midi_tx.value) + bindata
 
     # wait for stop bit
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.baud_clk)
     return BinaryValue(bindata)
 
 
@@ -81,7 +81,7 @@ async def test_midi_in(dut):
     await setup_dut(dut)
 
     # skip one baud_clk for readability of waveform
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.baud_clk)
 
     status = await generate_midi_in_data(dut, True)
 
@@ -90,7 +90,7 @@ async def test_midi_in(dut):
     # just some empty period of data
     for i in range(30):
         dut.midi_rx <= 1
-        await FallingEdge(dut.baud_clk)
+        await FallingEdge(dut.dout.baud_clk)
 
     assert dut.status_in == status
     assert dut.data1_in.value == 0
@@ -106,7 +106,7 @@ async def test_midi_in_2bytes(dut):
     await setup_dut(dut)
 
     # skip one baud_clk for readability of waveform
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.baud_clk)
     status = await generate_midi_in_data(dut, True)
     data1 = await generate_midi_in_data(dut, False)
 
@@ -115,7 +115,7 @@ async def test_midi_in_2bytes(dut):
     # just some empty period of data
     for i in range(30):
         dut.midi_rx <= 1
-        await FallingEdge(dut.baud_clk)
+        await FallingEdge(dut.dout.baud_clk)
 
     assert dut.status_in == status
     assert dut.data1_in.value == data1
@@ -131,7 +131,7 @@ async def test_midi_in_3bytes(dut):
     await setup_dut(dut)
 
     # skip one baud_clk for readability of waveform
-    await FallingEdge(dut.baud_clk)
+    await FallingEdge(dut.dout.baud_clk)
     status = await generate_midi_in_data(dut, True)
     data1 = await generate_midi_in_data(dut, False)
     data2 = await generate_midi_in_data(dut, False)
@@ -141,7 +141,7 @@ async def test_midi_in_3bytes(dut):
     # just some empty period of data
     for i in range(30):
         dut.midi_rx <= 1
-        await FallingEdge(dut.baud_clk)
+        await FallingEdge(dut.dout.baud_clk)
 
     assert dut.status_in == status
     assert dut.data1_in.value == data1
