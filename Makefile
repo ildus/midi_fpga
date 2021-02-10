@@ -2,11 +2,15 @@ PRJNAME  = midi_ctrl
 SRC_DIR = src
 XDC      = xc7/arty.xdc
 PCF      = ice40/ice40hx1.pcf
+CST		 = gowin/tangnano.cst
 BUILDDIR = build
 BUILDDIR_ARTY = ${BUILDDIR}/arty
 BUILDDIR_ICE40 = ${BUILDDIR}/ice40
+BUILDDIR_GOWIN = ${BUILDDIR}/gowin
 SOURCES  = $(wildcard ${SRC_DIR}/*.sv)
 FILES = $(subst src/,,${SOURCES})
+NEXTPNR_GOWIN ?= "nextpnr-gowin"
+
 export TOPLEVEL = midi_ctrl
 
 .PHONY: all
@@ -19,7 +23,9 @@ ${BUILDDIR}:
 	mkdir -p ${BUILDDIR}
 	mkdir -p ${BUILDDIR_ARTY}
 	mkdir -p ${BUILDDIR_ICE40}
+	mkdir -p ${BUILDDIR_GOWIN}
 
+# arty a7 workflow
 ${BUILDDIR_ARTY}/top.bit: ${BUILDDIR_ARTY}/top.sv ${XDC} build.tcl build_top.sh
 	cp ${XDC} ${BUILDDIR_ARTY}/top.xdc
 	cp build_top.sh ${BUILDDIR_ARTY}/
@@ -42,6 +48,7 @@ upload_xc7: ${BUILDDIR_ARTY}/top.bit
 
 PADDED=${BUILDDIR_ICE40}/padded.bin
 
+# ice40 workflow
 upload_ice40: ${PADDED}
 	scp ${PADDED} banana:~/${PRJNAME}.bin
 	ssh banana 'echo 25 > /sys/class/gpio/export && echo out > /sys/class/gpio/gpio25/direction'
@@ -63,6 +70,19 @@ ${BUILDDIR_ICE40}/${PRJNAME}.asc: ${BUILDDIR_ICE40}/${PRJNAME}.json ${PCF}
 
 ${BUILDDIR_ICE40}/${PRJNAME}.json: ${BUILDDIR}/a.out
 	yosys -p "read_verilog -sv ${SOURCES}; synth_ice40 -nocarry -abc2 -top ${TOPLEVEL} -json $@"
+
+#gowin workflow
+upload_gowin: ${BUILDDIR_GOWIN}/${PRJNAME}.fs
+	openFPGALoader -b {some_board} $^
+
+${BUILDDIR_GOWIN}/${PRJNAME}.fs: ${BUILDDIR_GOWIN}/${PRJNAME}_pnr.json
+	gowin_pack -d GW1N-1 -o $@ $^
+
+${BUILDDIR_GOWIN}/${PRJNAME}_pnr.json: ${BUILDDIR_GOWIN}/${PRJNAME}.json ${CST}
+	${NEXTPNR_GOWIN} --json ${BUILDDIR_GOWIN}/${PRJNAME}.json --write $@ --device GW1N-UV4LQ144C6/I5 --cst ${CST}
+
+${BUILDDIR_GOWIN}/${PRJNAME}.json: ${BUILDDIR}/a.out
+	yosys -p "read_verilog -sv ${SOURCES}; synth_gowin -top ${TOPLEVEL}; write_json $@"
 
 .PHONY: check
 check:
